@@ -2,9 +2,13 @@
 pydantic>=2.0.0
 python-dotenv>=1.0.0
 
-# LLM reasoning client (OpenAI SDK pointing to base_url="https://api.sarvam.ai/v1")
+# LLM reasoning client & orchestration
 openai>=1.0.0
+langgraph>=0.2.0
+langchain-core>=0.3.0
+langchain-openai>=0.2.0
 
 # API Backend & Testing
 fastapi>=0.100.0
 pytest>=7.0.0
+
