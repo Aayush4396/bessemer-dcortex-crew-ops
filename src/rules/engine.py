@@ -19,9 +19,9 @@ import json
 import sqlite3
 from datetime import date
 
-from .models import ALL_RULE_IDS, SNAPSHOT_DATE, LegalityReport, RuleResult
+from .models import ALL_RULE_IDS, RuleResult
 from .operational import check_reserve_window, check_schedule_overlap
-from .time_utils import calculate_duty_period, calculate_rolling_sum, parse_date, parse_utc
+from .time_utils import parse_date, parse_utc
 from .validators import (
     check_base,
     check_certifications,
@@ -32,31 +32,6 @@ from .validators import (
     check_qualification,
     check_rest,
 )
-
-# Re-export core domain entities so callers have direct canonical access
-__all__ = [
-    "check_crew_legality",
-    "check_crew_legality_for_pairing",
-    "RuleResult",
-    "LegalityReport",
-    "ALL_RULE_IDS",
-    "SNAPSHOT_DATE",
-    "check_fdp",
-    "check_duty_7d",
-    "check_flight_28d",
-    "check_rest",
-    "check_downstream_rest",
-    "check_qualification",
-    "check_certifications",
-    "check_base",
-    "check_schedule_overlap",
-    "check_reserve_window",
-    "parse_utc",
-    "parse_date",
-    "calculate_duty_period",
-    "calculate_rolling_sum",
-]
-
 
 def check_crew_legality(
     crew_id: str,
