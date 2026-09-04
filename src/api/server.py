@@ -13,8 +13,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
 from src.agent import run_crew_ops_agent
-from src.db.loader import init_db
 from src.rules.models import SNAPSHOT_DATE
+from src.tier1.connection import get_connection
 
 app = FastAPI(
     title="dCortex Crew Operations Advisor API",
@@ -30,17 +30,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-# Shared in-process or on-disk database connection
-_db_conn = None
-
-
-def get_db():
-    global _db_conn
-    if _db_conn is None:
-        db_path = os.getenv("DB_PATH", ":memory:")
-        _db_conn = init_db(db_path=db_path)
-    return _db_conn
 
 
 # ---------------------------------------------------------------------------
@@ -88,11 +77,14 @@ def health_check():
 @app.get("/api/stats", response_model=StatsResponse)
 def get_fleet_stats():
     """Fetch live counts and operational metadata from SQLite."""
-    conn = get_db()
-    flights_count = conn.execute("SELECT COUNT(*) FROM flights").fetchone()[0]
-    crew_count = conn.execute("SELECT COUNT(*) FROM crew").fetchone()[0]
-    pairings_count = conn.execute("SELECT COUNT(*) FROM pairings").fetchone()[0]
-    reserves_count = conn.execute("SELECT COUNT(*) FROM reserve_pool").fetchone()[0]
+    conn = get_connection()
+    try:
+        flights_count = conn.execute("SELECT COUNT(*) FROM flights").fetchone()[0]
+        crew_count = conn.execute("SELECT COUNT(*) FROM crew").fetchone()[0]
+        pairings_count = conn.execute("SELECT COUNT(*) FROM pairings").fetchone()[0]
+        reserves_count = conn.execute("SELECT COUNT(*) FROM reserve_pool").fetchone()[0]
+    finally:
+        conn.close()
 
     return StatsResponse(
         flights=flights_count,

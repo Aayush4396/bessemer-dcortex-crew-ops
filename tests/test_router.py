@@ -65,10 +65,10 @@ def test_should_continue_logic():
     state_tools = {"messages": [ai_with_tool]}
     assert should_continue(state_tools) == "tools"
 
-    # Message without tool call -> routes to 'synthesizer'
+    # Message without tool call -> routes to '__end__'
     ai_plain = AIMessage(content="Flight DX412 departs at 06:00Z.")
     state_plain = {"messages": [ai_plain]}
-    assert should_continue(state_plain) == "synthesizer"
+    assert should_continue(state_plain) == "__end__"
 
 
 def test_tools_node_execution(conn):

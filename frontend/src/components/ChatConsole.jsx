@@ -258,7 +258,15 @@ export default function ChatConsole() {
                 {m.sender === 'user' ? (
                   <p className="text-sm font-medium">{m.text}</p>
                 ) : (
-                  <div>{formatText(m.text)}</div>
+                  <div>
+                    {m.text ? (
+                      formatText(m.text)
+                    ) : (
+                      <p className="text-slate-300 italic text-xs">
+                        Query processed successfully. Details available in the audit trail below.
+                      </p>
+                    )}
+                  </div>
                 )}
 
                 {/* Explainability / Tool Audit Drawer */}
