@@ -1,0 +1,10 @@
+# Core data validation and environment
+pydantic>=2.0.0
+python-dotenv>=1.0.0
+
+# LLM reasoning client (OpenAI SDK pointing to base_url="https://api.sarvam.ai/v1")
+openai>=1.0.0
+
+# API Backend & Testing
+fastapi>=0.100.0
+pytest>=7.0.0

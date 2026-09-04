@@ -1,0 +1,1097 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>dCortex Agentic Crew Ops Advisor — Solution Playbook & Execution Guide</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Plus Jakarta Sans', 'sans-serif'],
+            mono: ['JetBrains Mono', 'monospace'],
+          },
+          colors: {
+            brand: {
+              50: '#ecfdf5',
+              400: '#34d399',
+              500: '#10b981',
+              600: '#059669',
+            },
+            dcortex: {
+              navy: '#050b14',
+              panel: '#091224',
+              card: '#0e1a34',
+              border: '#1b2a4a',
+              cyan: '#38bdf8',
+              emerald: '#10b981',
+              amber: '#fbbf24',
+              rose: '#f43f5e',
+              indigo: '#6366f1',
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    body {
+      background-color: #050b14;
+      color: #e2e8f0;
+      font-family: 'Plus Jakarta Sans', sans-serif;
+    }
+    .custom-scrollbar::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-track {
+      background: #091122;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb {
+      background: #1e2d4a;
+      border-radius: 4px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+      background: #334e7a;
+    }
+    .glow-cyan {
+      box-shadow: 0 0 25px -4px rgba(56, 189, 248, 0.3);
+    }
+    .glow-emerald {
+      box-shadow: 0 0 25px -4px rgba(16, 185, 129, 0.3);
+    }
+    .glow-rose {
+      box-shadow: 0 0 25px -4px rgba(244, 63, 94, 0.3);
+    }
+    @keyframes pulseGlow {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.7; transform: scale(1.05); }
+    }
+    .pulse-dot {
+      animation: pulseGlow 2s infinite ease-in-out;
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col custom-scrollbar selection:bg-brand-500 selection:text-white relative">
+
+  <!-- ========================================================================= -->
+  <!-- TOP APP HEADER                                                            -->
+  <!-- ========================================================================= -->
+  <header class="border-b border-slate-800/90 bg-[#050b14]/95 backdrop-blur-md sticky top-0 z-50">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+      <!-- Brand & Title -->
+      <div class="flex items-center space-x-3.5">
+        <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-emerald-500 via-teal-500 to-cyan-500 flex items-center justify-center shadow-lg shadow-emerald-500/20 shrink-0">
+          <i data-lucide="compass" class="w-5 h-5 text-slate-950 font-bold"></i>
+        </div>
+        <div>
+          <div class="flex items-center space-x-2">
+            <span class="font-black text-white tracking-wide text-base">dCortex<span class="text-emerald-400">Advisor</span></span>
+            <span class="text-[10px] uppercase font-mono px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-bold">Official Problem Blueprint</span>
+          </div>
+          <p class="text-[11px] text-slate-400 hidden sm:block">Step-by-Step Architecture, Dataset Schema & Zero-Hallucination Execution Plan</p>
+        </div>
+      </div>
+
+      <!-- Quick Status Badges -->
+      <div class="flex items-center space-x-2 text-xs font-mono">
+        <div class="hidden md:flex items-center space-x-2 bg-slate-900/90 px-3 py-1.5 rounded-lg border border-slate-800 text-slate-300">
+          <span class="w-2 h-2 rounded-full bg-emerald-400 pulse-dot"></span>
+          <span class="text-slate-400">Dataset:</span>
+          <span class="text-cyan-300 font-bold">11 Seeded JSON Files</span>
+        </div>
+        <div class="flex items-center space-x-1.5 bg-emerald-950/60 border border-emerald-500/40 text-emerald-300 px-3 py-1.5 rounded-lg font-bold">
+          <i data-lucide="target" class="w-3.5 h-3.5 text-emerald-400"></i>
+          <span>Goal: Tier 3 Advisor</span>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- ========================================================================= -->
+  <!-- NAVIGATION TABS                                                           -->
+  <!-- ========================================================================= -->
+  <nav class="bg-[#070e1b]/95 border-b border-slate-800/80 px-4 sticky top-16 z-40 backdrop-blur-md">
+    <div class="max-w-7xl mx-auto flex space-x-1 sm:space-x-2 overflow-x-auto custom-scrollbar py-2 text-xs sm:text-sm font-medium">
+      <button onclick="switchPlaybookTab('blueprint')" id="tab-btn-blueprint" class="pb-tab-btn active px-3.5 py-1.5 rounded-lg flex items-center space-x-2 text-emerald-400 bg-slate-900 border border-emerald-500/30 shrink-0 font-semibold">
+        <i data-lucide="map" class="w-3.5 h-3.5"></i>
+        <span>1. Mission & Exact Goals</span>
+      </button>
+      <button onclick="switchPlaybookTab('roadmap')" id="tab-btn-roadmap" class="pb-tab-btn px-3.5 py-1.5 rounded-lg flex items-center space-x-2 text-slate-400 hover:text-slate-200 hover:bg-slate-900/50 shrink-0">
+        <i data-lucide="git-branch" class="w-3.5 h-3.5"></i>
+        <span>2. 7-Step Build Sequence</span>
+      </button>
+      <button onclick="switchPlaybookTab('simulator')" id="tab-btn-simulator" class="pb-tab-btn px-3.5 py-1.5 rounded-lg flex items-center space-x-2 text-slate-400 hover:text-slate-200 hover:bg-slate-900/50 shrink-0">
+        <i data-lucide="play" class="w-3.5 h-3.5"></i>
+        <span>3. Interactive Tier 1-3 Solver</span>
+      </button>
+      <button onclick="switchPlaybookTab('rules')" id="tab-btn-rules" class="pb-tab-btn px-3.5 py-1.5 rounded-lg flex items-center space-x-2 text-slate-400 hover:text-slate-200 hover:bg-slate-900/50 shrink-0">
+        <i data-lucide="scale" class="w-3.5 h-3.5"></i>
+        <span>4. The 7 Legality Rules</span>
+      </button>
+      <button onclick="switchPlaybookTab('schema')" id="tab-btn-schema" class="pb-tab-btn px-3.5 py-1.5 rounded-lg flex items-center space-x-2 text-slate-400 hover:text-slate-200 hover:bg-slate-900/50 shrink-0">
+        <i data-lucide="database" class="w-3.5 h-3.5"></i>
+        <span>5. Dataset & SQLite Map</span>
+      </button>
+      <button onclick="switchPlaybookTab('code')" id="tab-btn-code" class="pb-tab-btn px-3.5 py-1.5 rounded-lg flex items-center space-x-2 text-slate-400 hover:text-slate-200 hover:bg-slate-900/50 shrink-0">
+        <i data-lucide="code-2" class="w-3.5 h-3.5"></i>
+        <span>6. Production Python Suite</span>
+      </button>
+      <button onclick="switchPlaybookTab('judging')" id="tab-btn-judging" class="pb-tab-btn px-3.5 py-1.5 rounded-lg flex items-center space-x-2 text-slate-400 hover:text-slate-200 hover:bg-slate-900/50 shrink-0">
+        <i data-lucide="trophy" class="w-3.5 h-3.5"></i>
+        <span>7. Evaluation & Judging Edge</span>
+      </button>
+    </div>
+  </nav>
+
+  <!-- ========================================================================= -->
+  <!-- MAIN CONTENT CONTAINER                                                    -->
+  <!-- ========================================================================= -->
+  <main class="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8 space-y-10">
+
+    <!-- ======================================================================= -->
+    <!-- TAB 1: MISSION & EXACT GOAL BLUEPRINT                                   -->
+    <!-- ======================================================================= -->
+    <div id="view-blueprint" class="pb-tab-content space-y-8">
+
+      <!-- Hero Card -->
+      <div class="relative overflow-hidden rounded-3xl bg-gradient-to-br from-[#0c172e] via-[#091224] to-[#040813] border border-slate-800 p-6 sm:p-10 shadow-2xl">
+        <div class="absolute -right-16 -top-16 w-80 h-80 bg-cyan-500/10 rounded-full blur-3xl pointer-events-none"></div>
+        <div class="absolute -left-16 -bottom-16 w-80 h-80 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none"></div>
+
+        <div class="relative z-10 space-y-5">
+          <div class="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-400 text-xs font-mono font-semibold border border-emerald-500/20">
+            <i data-lucide="award" class="w-3.5 h-3.5"></i>
+            <span>Bessemer Tech Catalyst × dCortex Challenge</span>
+          </div>
+
+          <h1 class="text-3xl sm:text-5xl font-black text-white tracking-tight leading-tight">
+            Building the Agentic Crew Ops Advisor: The Path to 100/100
+          </h1>
+
+          <p class="text-slate-300 text-sm sm:text-base leading-relaxed max-w-3xl">
+            Airlines operate on paper-perfect plans that unravel every single day at 5:00 AM. When sick calls, duty-hour limits, lapsed medicals, or runway closures hit, the Crew Control desk must solve a recursive, multi-constraint puzzle across rosters, duty clocks, and a dense regulatory rulebook.
+          </p>
+
+          <!-- The Central Engineering Dichotomy -->
+          <div class="p-5 rounded-2xl bg-[#050b16]/90 border border-amber-500/30 space-y-2.5">
+            <div class="flex items-center space-x-2 text-amber-400 font-bold text-xs uppercase tracking-wider font-mono">
+              <i data-lucide="alert-triangle" class="w-4 h-4 text-amber-400"></i>
+              <span>The Central Engineering Trap (Stated in Official Brief)</span>
+            </div>
+            <p class="text-slate-300 text-xs sm:text-sm leading-relaxed">
+              <strong class="text-rose-400">"The obvious approach — putting the dataset in the prompt and letting an LLM answer — works for Tier 1 and fails completely at Tier 2 and Tier 3."</strong> Legality is exact arithmetic; an LLM that approximates a duty hour or sector calculation produces answers that are fluent, confident, and illegal. Operationally, that is worse than no answer.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <!-- The 3 Tiers Explained with Exact PDF Examples -->
+      <div class="space-y-4">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-1 border-b border-slate-800 pb-3">
+          <div>
+            <h2 class="text-xl font-bold text-white flex items-center space-x-2">
+              <i data-lucide="layers" class="w-5 h-5 text-cyan-400"></i>
+              <span>The 3-Tier Ladder: Where Hackathons Are Won</span>
+            </h2>
+            <p class="text-xs text-slate-400">The challenge tiers are structured so every team has an on-ramp, and no team hits a ceiling.</p>
+          </div>
+          <span class="text-xs font-mono text-emerald-400 bg-emerald-950/70 border border-emerald-500/30 px-3 py-1 rounded-lg">Target: Polished T1 + Rigorous T2 + Ranked T3</span>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
+          <!-- Tier 1 -->
+          <div class="p-5 rounded-2xl bg-slate-900/90 border border-slate-800 flex flex-col justify-between space-y-4 hover:border-slate-700 transition-all">
+            <div class="space-y-2.5">
+              <div class="flex justify-between items-center">
+                <span class="px-2.5 py-0.5 rounded bg-slate-800 text-cyan-400 font-mono text-[10px] font-bold uppercase">Tier 1: Mandatory</span>
+                <span class="text-xs font-mono text-slate-400">Lookup & Retrieval</span>
+              </div>
+              <h3 class="text-base font-bold text-white">Direct Operational Facts</h3>
+              <p class="text-xs text-slate-300 leading-relaxed">
+                Directly answerable from the relational data with zero domain modeling required.
+              </p>
+              <div class="p-3 bg-slate-950 rounded-xl border border-slate-800/80 text-[11px] font-mono text-slate-300 space-y-1.5">
+                <div class="text-cyan-300">"Who's on reserve at BLR tomorrow?"</div>
+                <div class="text-cyan-300">"How many duty hours does C-1042 have left this week?"</div>
+                <div class="text-cyan-300">"List crew whose licence expires in 30 days."</div>
+              </div>
+            </div>
+            <div class="pt-3 border-t border-slate-800 text-[11px] font-mono text-emerald-400">
+              ✓ Solved by: Text-to-SQL / SQLite indexed tables
+            </div>
+          </div>
+
+          <!-- Tier 2 -->
+          <div class="p-5 rounded-2xl bg-slate-900/90 border border-cyan-500/30 flex flex-col justify-between space-y-4 hover:border-cyan-500/50 transition-all">
+            <div class="space-y-2.5">
+              <div class="flex justify-between items-center">
+                <span class="px-2.5 py-0.5 rounded bg-cyan-950/80 text-cyan-300 border border-cyan-500/40 font-mono text-[10px] font-bold uppercase">Tier 2: Expected</span>
+                <span class="text-xs font-mono text-cyan-400">Consequence & Simulation</span>
+              </div>
+              <h3 class="text-base font-bold text-white">Impact & Ripple Analysis</h3>
+              <p class="text-xs text-slate-300 leading-relaxed">
+                Requires reasoning about consequences: tracing broken pairings, downstream flights, and secondary duty breaches.
+              </p>
+              <div class="p-3 bg-slate-950 rounded-xl border border-slate-800/80 text-[11px] font-mono text-slate-300 space-y-1.5">
+                <div class="text-cyan-300">"Captain C-1042 called in sick for tomorrow — which flights are now uncrewed?"</div>
+                <div class="text-cyan-300">"If I move FO C-2087 onto DX412, does anyone breach a duty limit?"</div>
+                <div class="text-cyan-300">"Station BLR is closed 14:00-20:00 — what's the crew impact?"</div>
+              </div>
+            </div>
+            <div class="pt-3 border-t border-slate-800 text-[11px] font-mono text-cyan-400">
+              ✓ Solved by: Pairing Graph Tracer + Exact Rule Checkers
+            </div>
+          </div>
+
+          <!-- Tier 3 -->
+          <div class="p-5 rounded-2xl bg-slate-900/90 border border-emerald-500/40 flex flex-col justify-between space-y-4 hover:border-emerald-500/60 transition-all">
+            <div class="space-y-2.5">
+              <div class="flex justify-between items-center">
+                <span class="px-2.5 py-0.5 rounded bg-emerald-950/80 text-emerald-300 border border-emerald-500/40 font-mono text-[10px] font-bold uppercase">Tier 3: Stretch (Winning)</span>
+                <span class="text-xs font-mono text-emerald-400">Action & Ranking</span>
+              </div>
+              <h3 class="text-base font-bold text-white">Ranked Legal Solutions</h3>
+              <p class="text-xs text-slate-300 leading-relaxed">
+                Synthesizing viable recovery options, verifying them against all 7 rules, computing cost in INR, and ranking trade-offs.
+              </p>
+              <div class="p-3 bg-slate-950 rounded-xl border border-slate-800/80 text-[11px] font-mono text-slate-300 space-y-1.5">
+                <div class="text-emerald-300">"Captain C-1042 is out — what should I do?"</div>
+                <div class="text-slate-400 text-[10px]">Outputs: Ranked candidate actions with exact INR cost, rules checked, coverage, and reasoning trail.</div>
+                <div class="text-amber-300 text-[10px]">Bonus: Draft crew notifications via SMS/voice.</div>
+              </div>
+            </div>
+            <div class="pt-3 border-t border-slate-800 text-[11px] font-mono text-emerald-400">
+              ✓ Solved by: Deterministic Combinatorial Pruner + Cost Function
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Core Architectural Boundary Callout -->
+      <div class="p-6 rounded-2xl bg-slate-950 border border-slate-800 space-y-4">
+        <div class="flex items-center space-x-2 text-sm font-bold text-white">
+          <i data-lucide="split" class="w-4 h-4 text-purple-400"></i>
+          <span>Where the Boundary Must Be Drawn: What Code Does vs. What AI Does</span>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 text-xs">
+          <div class="p-4 rounded-xl bg-slate-900 border border-emerald-500/30 space-y-2">
+            <span class="text-emerald-400 font-mono font-bold uppercase text-[11px]">Deterministic Python / SQL Engine (The Truth Layer)</span>
+            <ul class="space-y-1.5 text-slate-300 list-disc list-inside leading-relaxed">
+              <li><strong>Exact Duty Clock Math:</strong> Calculating remaining hours against the 60h/7d and 100h/28d ceilings.</li>
+              <li><strong>FDP Table Verification:</strong> Exact sector reductions (13h down to 9h).</li>
+              <li><strong>Pairing Traversal:</strong> Finding all flight legs tied to pairing <code>P-2291</code>.</li>
+              <li><strong>Financial Calculations:</strong> Multiplying callout, deadhead ticket, and penalty rates in INR.</li>
+              <li><strong>Zero Tolerance:</strong> 100% pass/fail decisions on regulations.</li>
+            </ul>
+          </div>
+
+          <div class="p-4 rounded-xl bg-slate-900 border border-cyan-500/30 space-y-2">
+            <span class="text-cyan-400 font-mono font-bold uppercase text-[11px]">Large Language Model (The Reasoning & Narrative Layer)</span>
+            <ul class="space-y-1.5 text-slate-300 list-disc list-inside leading-relaxed">
+              <li><strong>Intent & Entity Parsing:</strong> Extracting crew ID (<code>C-1042</code>), date, flight number from natural English.</li>
+              <li><strong>Tool Selection:</strong> Calling the appropriate Python function with extracted arguments.</li>
+              <li><strong>Hypothesis Generation:</strong> Proposing candidate solutions (e.g. reserve activation vs deadhead from DEL).</li>
+              <li><strong>Human-Readable Explanations:</strong> Synthesizing plain-language rationales why Option 1 beats Option 2.</li>
+              <li><strong>Notification Drafting:</strong> Generating professional ACARS/WhatsApp messages to notify crew.</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- ======================================================================= -->
+    <!-- TAB 2: 7-STEP IMPLEMENTATION ROADMAP                                    -->
+    <!-- ======================================================================= -->
+    <div id="view-roadmap" class="pb-tab-content hidden space-y-8">
+      <div class="border-b border-slate-800 pb-4">
+        <h2 class="text-2xl font-bold text-white">The 7-Step Hackathon Implementation Roadmap</h2>
+        <p class="text-slate-400 text-sm mt-1">Structured chronological sequence to build from data ingestion to winning live demo.</p>
+      </div>
+
+      <div class="space-y-4">
+        <!-- Step 1 -->
+        <div class="p-5 rounded-2xl bg-slate-900/90 border border-slate-800 space-y-3">
+          <div class="flex items-center justify-between">
+            <span class="px-2.5 py-1 rounded bg-slate-800 text-cyan-400 font-mono text-xs font-bold">STEP 1 (Hours 0 - 2)</span>
+            <span class="text-xs font-mono text-slate-400">Data Modeling</span>
+          </div>
+          <h3 class="text-base font-bold text-white">Ingest Synthetic JSON Files into In-Memory SQLite</h3>
+          <p class="text-xs text-slate-300 leading-relaxed">
+            The starter pack contains 11 relational JSON files. Instead of performing expensive semantic vector searches or raw text dumps into prompts, load all tables into a fast local SQLite database with relational foreign keys.
+          </p>
+          <div class="p-3 bg-slate-950 rounded-lg text-xs font-mono text-emerald-400">
+            sqlite3.connect(':memory:') → load flights, crew, rosters, duty_clocks, reserve_pool, certifications
+          </div>
+        </div>
+
+        <!-- Step 2 -->
+        <div class="p-5 rounded-2xl bg-slate-900/90 border border-slate-800 space-y-3">
+          <div class="flex items-center justify-between">
+            <span class="px-2.5 py-1 rounded bg-slate-800 text-emerald-400 font-mono text-xs font-bold">STEP 2 (Hours 2 - 5)</span>
+            <span class="text-xs font-mono text-slate-400">Deterministic Core</span>
+          </div>
+          <h3 class="text-base font-bold text-white">Build the 7 Hard Rule Validators in Pure Python</h3>
+          <p class="text-xs text-slate-300 leading-relaxed">
+            Implement exact arithmetic functions for <code>RULE-FDP-01</code> through <code>RULE-BASE-07</code>. Write unit tests using the 6 worked scenarios in <code>scenarios.json</code> to prove 100% agreement with the official answer keys.
+          </p>
+          <div class="p-3 bg-slate-950 rounded-lg text-xs font-mono text-emerald-400">
+            def check_legality(crew_id, proposed_duty) -> {"is_legal": bool, "violated_rules": list}
+          </div>
+        </div>
+
+        <!-- Step 3 -->
+        <div class="p-5 rounded-2xl bg-slate-900/90 border border-slate-800 space-y-3">
+          <div class="flex items-center justify-between">
+            <span class="px-2.5 py-1 rounded bg-slate-800 text-indigo-400 font-mono text-xs font-bold">STEP 3 (Hours 5 - 8)</span>
+            <span class="text-xs font-mono text-slate-400">Tier 1 Engine</span>
+          </div>
+          <h3 class="text-base font-bold text-white">Build the Tier 1 Natural Language Query Engine</h3>
+          <p class="text-xs text-slate-300 leading-relaxed">
+            Implement an intent-routing mechanism (using LangChain, function calling, or regularized few-shot prompts) that maps questions like <em>"Who's on reserve at BLR tomorrow?"</em> into precise SQL queries.
+          </p>
+          <div class="p-3 bg-slate-950 rounded-lg text-xs font-mono text-emerald-400">
+            User Query → LLM Tool Call (e.g. query_reserve_pool(base="BLR", date="2026-09-15")) → SQLite Result
+          </div>
+        </div>
+
+        <!-- Step 4 -->
+        <div class="p-5 rounded-2xl bg-slate-900/90 border border-slate-800 space-y-3">
+          <div class="flex items-center justify-between">
+            <span class="px-2.5 py-1 rounded bg-slate-800 text-amber-400 font-mono text-xs font-bold">STEP 4 (Hours 8 - 12)</span>
+            <span class="text-xs font-mono text-slate-400">Tier 2 Simulation</span>
+          </div>
+          <h3 class="text-base font-bold text-white">Build the Consequence & Ripple Tracer</h3>
+          <p class="text-xs text-slate-300 leading-relaxed">
+            When crew calls sick, trace their assigned pairing (e.g. <code>P-2291</code>). Extract all subsequent legs (e.g. <code>DX412, DX413, DX588</code>), sum passengers affected, and evaluate secondary downstream crew assignment conflicts.
+          </p>
+          <div class="p-3 bg-slate-950 rounded-lg text-xs font-mono text-emerald-400">
+            trace_consequences(sick_crew_id="C-1042", date="2026-09-15") → exact JSON matching Page 4 schema
+          </div>
+        </div>
+
+        <!-- Step 5 -->
+        <div class="p-5 rounded-2xl bg-slate-900/90 border border-slate-800 space-y-3">
+          <div class="flex items-center justify-between">
+            <span class="px-2.5 py-1 rounded bg-slate-800 text-purple-400 font-mono text-xs font-bold">STEP 5 (Hours 12 - 16)</span>
+            <span class="text-xs font-mono text-slate-400">Tier 3 Solver</span>
+          </div>
+          <h3 class="text-base font-bold text-white">Build Heuristic Candidate Generation & INR Cost Scoring</h3>
+          <p class="text-xs text-slate-300 leading-relaxed">
+            Generate 3 candidate tactics: (1) Local Reserve Standby, (2) Inbound Crew Swap, (3) Deadheading from alternate base. Filter out illegal candidates with the Step 2 rule validator, calculate exact cost in INR using <code>costs.json</code>, and sort ascending by cost.
+          </p>
+        </div>
+
+        <!-- Step 6 -->
+        <div class="p-5 rounded-2xl bg-slate-900/90 border border-slate-800 space-y-3">
+          <div class="flex items-center justify-between">
+            <span class="px-2.5 py-1 rounded bg-slate-800 text-teal-400 font-mono text-xs font-bold">STEP 6 (Hours 16 - 19)</span>
+            <span class="text-xs font-mono text-slate-400">Explainability & UX</span>
+          </div>
+          <h3 class="text-base font-bold text-white">Generate Controller Reasoning Trails & Crew Notification Messages</h3>
+          <p class="text-xs text-slate-300 leading-relaxed">
+            Format the output with visible explanations of why options were selected and rejected. Draft ready-to-send SMS/WhatsApp alerts for the replacement crew (bonus feature).
+          </p>
+        </div>
+
+        <!-- Step 7 -->
+        <div class="p-5 rounded-2xl bg-slate-900/90 border border-slate-800 space-y-3">
+          <div class="flex items-center justify-between">
+            <span class="px-2.5 py-1 rounded bg-slate-800 text-rose-400 font-mono text-xs font-bold">STEP 7 (Hours 19 - 24)</span>
+            <span class="text-xs font-mono text-slate-400">Verification & Demo Prep</span>
+          </div>
+          <h3 class="text-base font-bold text-white">Run Dataset Validator, Benchmark Against Questions, & Rehearse Demo</h3>
+          <p class="text-xs text-slate-300 leading-relaxed">
+            Run <code>validate.py</code> to confirm relational integrity. Test against all ~40 questions in <code>questions.json</code>. Prepare the mandatory architecture diagram, README, and honest failure analysis.
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <!-- ======================================================================= -->
+    <!-- TAB 3: INTERACTIVE TIER 1-3 SOLVER SIMULATOR                            -->
+    <!-- ======================================================================= -->
+    <div id="view-simulator" class="pb-tab-content hidden space-y-8">
+      <div class="border-b border-slate-800 pb-4">
+        <h2 class="text-2xl font-bold text-white">Interactive Tier 1–3 Question Solver Simulator</h2>
+        <p class="text-slate-400 text-sm mt-1">Experience how the advisor processes queries across all three tiers with exact schema compliance.</p>
+      </div>
+
+      <!-- Simulator Selector -->
+      <div class="bg-slate-900/90 border border-slate-800 rounded-2xl p-5 space-y-4">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div>
+            <label class="text-xs font-bold font-mono text-slate-300 uppercase block mb-1">Select Sample Challenge Query:</label>
+            <select id="sim-query-selector" class="bg-slate-950 border border-slate-700 text-cyan-300 font-mono text-xs rounded-xl px-3 py-2 focus:border-emerald-500 focus:outline-none w-full sm:w-[480px]" onchange="loadSimQuery()">
+              <option value="t1_duty">Tier 1: "How many duty hours does C-1042 have left this week?"</option>
+              <option value="t1_reserve">Tier 1: "Who is on reserve at BLR tomorrow (15 Sep)?"</option>
+              <option value="t1_certs">Tier 1: "List crew whose licence or medical expires in next 30 days"</option>
+              <option value="t2_sick">Tier 2: "Captain C-1042 called in sick for 15 Sep — which flights are uncrewed?"</option>
+              <option value="t2_swap">Tier 2: "If I move FO C-2087 onto DX412, does anyone breach a duty limit?"</option>
+              <option value="t3_action">Tier 3: "Captain C-1042 is out — what should I do? (Ranked Actions)"</option>
+            </select>
+          </div>
+          <button onclick="runSolverSimulation()" class="px-5 py-2.5 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-bold text-xs rounded-xl shadow-lg transition-all flex items-center justify-center space-x-2 shrink-0">
+            <i data-lucide="play" class="w-4 h-4"></i>
+            <span>Execute Query Pipeline</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Execution Trace Pipeline Visualizer -->
+      <div class="grid grid-cols-1 lg:grid-cols-4 gap-3 text-xs font-mono">
+        <div id="trace-step-1" class="p-3.5 rounded-xl bg-slate-950 border border-slate-800 space-y-1">
+          <div class="text-[10px] text-slate-500 font-bold uppercase">1. Intent Classification</div>
+          <div id="trace-intent-val" class="text-cyan-300 font-bold truncate">QUERY_DUTY_HOURS</div>
+        </div>
+        <div id="trace-step-2" class="p-3.5 rounded-xl bg-slate-950 border border-slate-800 space-y-1">
+          <div class="text-[10px] text-slate-500 font-bold uppercase">2. Deterministic Tool</div>
+          <div id="trace-tool-val" class="text-emerald-300 font-bold truncate">sqlite_query_duty()</div>
+        </div>
+        <div id="trace-step-3" class="p-3.5 rounded-xl bg-slate-950 border border-slate-800 space-y-1">
+          <div class="text-[10px] text-slate-500 font-bold uppercase">3. Rules Verified</div>
+          <div id="trace-rule-val" class="text-purple-300 font-bold truncate">RULE-DUTY-02 (60h/7d)</div>
+        </div>
+        <div id="trace-step-4" class="p-3.5 rounded-xl bg-slate-950 border border-slate-800 space-y-1">
+          <div class="text-[10px] text-slate-500 font-bold uppercase">4. Verification Status</div>
+          <div id="trace-status-val" class="text-emerald-400 font-bold truncate">100% Deterministic ✓</div>
+        </div>
+      </div>
+
+      <!-- Split Output: Structured JSON + Controller Explanation -->
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
+        <!-- JSON View -->
+        <div class="bg-slate-950 border border-slate-800 rounded-2xl p-5 space-y-2">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-mono font-bold text-slate-400 uppercase">Normalized JSON Output (Evaluator Compatible)</span>
+            <button onclick="copyCodeSnippet('solver-json-output')" class="text-xs font-mono text-emerald-400 hover:text-emerald-300 flex items-center space-x-1">
+              <i data-lucide="copy" class="w-3 h-3"></i><span>Copy JSON</span>
+            </button>
+          </div>
+          <pre id="solver-json-output" class="p-3.5 rounded-xl bg-[#060c18] border border-slate-800 text-[11px] font-mono text-emerald-400 overflow-x-auto h-72 custom-scrollbar"></pre>
+        </div>
+
+        <!-- Human Explanation & Notification Drafter -->
+        <div class="bg-slate-950 border border-slate-800 rounded-2xl p-5 space-y-4 flex flex-col justify-between">
+          <div class="space-y-3">
+            <span class="text-xs font-mono font-bold text-cyan-400 uppercase flex items-center space-x-1.5">
+              <i data-lucide="message-square" class="w-4 h-4 text-cyan-400"></i>
+              <span>Controller Plain-Language Explanation:</span>
+            </span>
+            <div id="solver-explanation-output" class="p-3.5 rounded-xl bg-[#060c18] border border-slate-800 text-xs text-slate-300 leading-relaxed min-h-[100px]"></div>
+          </div>
+
+          <!-- Bonus: Crew Draft Notification -->
+          <div class="pt-3 border-t border-slate-800 space-y-2">
+            <span class="text-[11px] font-mono font-bold text-amber-400 uppercase flex items-center space-x-1">
+              <i data-lucide="send" class="w-3.5 h-3.5 text-amber-400"></i>
+              <span>Bonus: Crew Dispatch Notification Draft</span>
+            </span>
+            <div id="solver-notification-draft" class="p-3 rounded-lg bg-amber-500/[0.06] border border-amber-500/20 text-xs text-amber-200/90 font-mono"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ======================================================================= -->
+    <!-- TAB 4: THE 7 LEGALITY RULES ENGINE                                      -->
+    <!-- ======================================================================= -->
+    <div id="view-rules" class="pb-tab-content hidden space-y-8">
+      <div class="border-b border-slate-800 pb-4">
+        <h2 class="text-2xl font-bold text-white">The 7 Hard Legality Rules (Exact Arithmetic Engine)</h2>
+        <p class="text-slate-400 text-sm mt-1">Official machine-readable constraints from `rules.json` that the advisor must never hallucinate on.</p>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <!-- RULE-FDP-01 -->
+        <div class="p-5 rounded-2xl bg-slate-900 border border-cyan-500/30 space-y-2">
+          <div class="flex items-center justify-between">
+            <span class="px-2 py-0.5 rounded bg-cyan-950 text-cyan-300 font-mono text-[10px] font-bold">RULE-FDP-01</span>
+            <span class="text-[10px] text-slate-400">Duty Period</span>
+          </div>
+          <h4 class="text-sm font-bold text-white">Flight Duty Period (FDP) Limit</h4>
+          <p class="text-xs text-slate-300 leading-relaxed">
+            Maximum FDP of <strong>13.0 hours</strong>, progressively reduced by sectors flown (1-2 sectors: 13h, 3 sectors: 12h, 4 sectors: 11h, 5+ sectors: 10h).
+          </p>
+        </div>
+
+        <!-- RULE-DUTY-02 -->
+        <div class="p-5 rounded-2xl bg-slate-900 border border-cyan-500/30 space-y-2">
+          <div class="flex items-center justify-between">
+            <span class="px-2 py-0.5 rounded bg-cyan-950 text-cyan-300 font-mono text-[10px] font-bold">RULE-DUTY-02</span>
+            <span class="text-[10px] text-slate-400">7-Day Cumulative</span>
+          </div>
+          <h4 class="text-sm font-bold text-white">60 Duty Hours in 7 Days</h4>
+          <p class="text-xs text-slate-300 leading-relaxed">
+            Maximum of <strong>60 duty hours</strong> in any 7 consecutive days. Exceeding by even 1 minute grounds the pilot.
+          </p>
+        </div>
+
+        <!-- RULE-FLT-03 -->
+        <div class="p-5 rounded-2xl bg-slate-900 border border-cyan-500/30 space-y-2">
+          <div class="flex items-center justify-between">
+            <span class="px-2 py-0.5 rounded bg-cyan-950 text-cyan-300 font-mono text-[10px] font-bold">RULE-FLT-03</span>
+            <span class="text-[10px] text-slate-400">28-Day Cumulative</span>
+          </div>
+          <h4 class="text-sm font-bold text-white">100 Flight Hours in 28 Days</h4>
+          <p class="text-xs text-slate-300 leading-relaxed">
+            Maximum <strong>100 airborne flight hours</strong> (block hours) in any 28 consecutive days.
+          </p>
+        </div>
+
+        <!-- RULE-REST-04 -->
+        <div class="p-5 rounded-2xl bg-slate-900 border border-emerald-500/30 space-y-2">
+          <div class="flex items-center justify-between">
+            <span class="px-2 py-0.5 rounded bg-emerald-950 text-emerald-300 font-mono text-[10px] font-bold">RULE-REST-04</span>
+            <span class="text-[10px] text-slate-400">Mandatory Rest</span>
+          </div>
+          <h4 class="text-sm font-bold text-white">Minimum 12h Rest Window</h4>
+          <p class="text-xs text-slate-300 leading-relaxed">
+            Minimum <strong>12 uninterrupted hours of rest</strong> required prior to commencing any flight duty period.
+          </p>
+        </div>
+
+        <!-- RULE-QUAL-05 -->
+        <div class="p-5 rounded-2xl bg-slate-900 border border-emerald-500/30 space-y-2">
+          <div class="flex items-center justify-between">
+            <span class="px-2 py-0.5 rounded bg-emerald-950 text-emerald-300 font-mono text-[10px] font-bold">RULE-QUAL-05</span>
+            <span class="text-[10px] text-slate-400">Type Rating</span>
+          </div>
+          <h4 class="text-sm font-bold text-white">Aircraft Type Certification</h4>
+          <p class="text-xs text-slate-300 leading-relaxed">
+            Crew must hold valid rating for assigned aircraft (e.g., A320 Captain cannot be assigned to B737 flight).
+          </p>
+        </div>
+
+        <!-- RULE-CERT-06 -->
+        <div class="p-5 rounded-2xl bg-slate-900 border border-emerald-500/30 space-y-2">
+          <div class="flex items-center justify-between">
+            <span class="px-2 py-0.5 rounded bg-emerald-950 text-emerald-300 font-mono text-[10px] font-bold">RULE-CERT-06</span>
+            <span class="text-[10px] text-slate-400">Active Validity</span>
+          </div>
+          <h4 class="text-sm font-bold text-white">Certifications & Medicals</h4>
+          <p class="text-xs text-slate-300 leading-relaxed">
+            All pilot licences, class-1 medicals, and recurrent training certificates must be strictly valid on duty date.
+          </p>
+        </div>
+
+        <!-- RULE-BASE-07 -->
+        <div class="p-5 rounded-2xl bg-slate-900 border border-amber-500/30 space-y-2 md:col-span-2 lg:col-span-3">
+          <div class="flex items-center justify-between">
+            <span class="px-2 py-0.5 rounded bg-amber-950 text-amber-300 font-mono text-[10px] font-bold">RULE-BASE-07</span>
+            <span class="text-[10px] text-slate-400">Station Geometry & Deadhead</span>
+          </div>
+          <h4 class="text-sm font-bold text-white">Reserve Base Callout & Deadhead Penalty</h4>
+          <p class="text-xs text-slate-300 leading-relaxed">
+            Reserve callouts must originate from the flight's departure station base (e.g. BLR for BLR departures), <em>unless</em> a repositioning commercial deadhead cost (plus flight delay buffer) is applied from an alternate hub (e.g. DEL).
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <!-- ======================================================================= -->
+    <!-- TAB 5: DATASET SCHEMA & SQLITE RELATIONAL MAP                           -->
+    <!-- ======================================================================= -->
+    <div id="view-schema" class="pb-tab-content hidden space-y-8">
+      <div class="border-b border-slate-800 pb-4">
+        <h2 class="text-2xl font-bold text-white">Seeded Dataset Architecture (11 JSON Files)</h2>
+        <p class="text-slate-400 text-sm mt-1">Relational mapping of the synthetic dataset for fast in-memory SQLite querying.</p>
+      </div>
+
+      <div class="overflow-x-auto custom-scrollbar bg-slate-950 p-4 rounded-2xl border border-slate-800">
+        <table class="w-full text-xs text-left text-slate-300">
+          <thead class="bg-slate-900 text-slate-400 font-mono uppercase text-[11px]">
+            <tr>
+              <th class="p-3">File Name</th>
+              <th class="p-3">Entity Description</th>
+              <th class="p-3">Primary Key / Links</th>
+              <th class="p-3">Key Fields</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-slate-800/80 font-sans">
+            <tr class="hover:bg-slate-900/40">
+              <td class="p-3 font-mono font-bold text-cyan-300">flights.json</td>
+              <td class="p-3">7-day schedule, ~140 flights, 8 stations</td>
+              <td class="p-3 font-mono text-slate-400">flight_num</td>
+              <td class="p-3 font-mono text-slate-300">origin, dest, departure_time, arrival_time, aircraft_type, block_minutes</td>
+            </tr>
+            <tr class="hover:bg-slate-900/40">
+              <td class="p-3 font-mono font-bold text-cyan-300">crew.json</td>
+              <td class="p-3">~150 pilots and first officers</td>
+              <td class="p-3 font-mono text-slate-400">crew_id</td>
+              <td class="p-3 font-mono text-slate-300">name, rank, base, ratings (["A320"]), seniority, reachability_minutes</td>
+            </tr>
+            <tr class="hover:bg-slate-900/40">
+              <td class="p-3 font-mono font-bold text-cyan-300">rosters.json</td>
+              <td class="p-3">Pairings & scheduled duty assignments</td>
+              <td class="p-3 font-mono text-slate-400">pairing_id, crew_id</td>
+              <td class="p-3 font-mono text-slate-300">pairing_id, date, flight_numbers (["DX412", "DX413", "DX588"])</td>
+            </tr>
+            <tr class="hover:bg-slate-900/40">
+              <td class="p-3 font-mono font-bold text-cyan-300">duty_clocks.json</td>
+              <td class="p-3">Current cumulative flight and duty hours</td>
+              <td class="p-3 font-mono text-slate-400">crew_id</td>
+              <td class="p-3 font-mono text-slate-300">duty_hours_7d, flight_hours_28d, last_rest_ended</td>
+            </tr>
+            <tr class="hover:bg-slate-900/40">
+              <td class="p-3 font-mono font-bold text-emerald-300">reserve_pool.json</td>
+              <td class="p-3">On-call standby pilots by station</td>
+              <td class="p-3 font-mono text-slate-400">crew_id, date</td>
+              <td class="p-3 font-mono text-slate-300">base, standby_type ("HOT"/"COLD"), on_call_start, on_call_end</td>
+            </tr>
+            <tr class="hover:bg-slate-900/40">
+              <td class="p-3 font-mono font-bold text-emerald-300">certifications.json</td>
+              <td class="p-3">Pilot licenses, medicals, recurrent training</td>
+              <td class="p-3 font-mono text-slate-400">crew_id</td>
+              <td class="p-3 font-mono text-slate-300">license_expiry, medical_expiry, recurrent_training_due</td>
+            </tr>
+            <tr class="hover:bg-slate-900/40">
+              <td class="p-3 font-mono font-bold text-purple-300">rules.json</td>
+              <td class="p-3">7 machine-readable legal constraint rules</td>
+              <td class="p-3 font-mono text-slate-400">rule_id</td>
+              <td class="p-3 font-mono text-slate-300">RULE-FDP-01 to RULE-BASE-07</td>
+            </tr>
+            <tr class="hover:bg-slate-900/40">
+              <td class="p-3 font-mono font-bold text-purple-300">costs.json</td>
+              <td class="p-3">Callout, overtime, deadhead, & pax penalties</td>
+              <td class="p-3 font-mono text-slate-400">rate_type</td>
+              <td class="p-3 font-mono text-slate-300">callout_inr (18500), deadhead_inr (41200), delay_per_min_inr</td>
+            </tr>
+            <tr class="hover:bg-slate-900/40">
+              <td class="p-3 font-mono font-bold text-amber-300">scenarios.json</td>
+              <td class="p-3">6 worked disruption test scenarios with keys</td>
+              <td class="p-3 font-mono text-slate-400">scenario_id</td>
+              <td class="p-3 font-mono text-slate-300">event, affected_crew, expected_impact, expected_ranking</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ======================================================================= -->
+    <!-- TAB 6: PRODUCTION PYTHON SUITE                                          -->
+    <!-- ======================================================================= -->
+    <div id="view-code" class="pb-tab-content hidden space-y-8">
+      <div class="border-b border-slate-800 pb-4">
+        <h2 class="text-2xl font-bold text-white">Production Python Starter Suite (5 Core Modules)</h2>
+        <p class="text-slate-400 text-sm mt-1">Copy-paste ready, zero-dependency Python code matching the exact schemas of the challenge.</p>
+      </div>
+
+      <!-- File 1: Ingestion -->
+      <div class="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-lg">
+        <div class="bg-slate-950 px-5 py-3 border-b border-slate-800 flex items-center justify-between">
+          <span class="text-xs font-mono text-slate-300 font-bold">1. dataset_loader.py — SQLite Ingestion & Relational Storage</span>
+          <button onclick="copyCodeSnippet('code-loader-block')" class="px-3 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-mono rounded">Copy Code</button>
+        </div>
+        <pre class="p-4 text-xs font-mono text-cyan-300 bg-[#070e1b] overflow-x-auto custom-scrollbar" id="code-loader-block"><code>import json
+import sqlite3
+from pathlib import Path
+
+def init_airline_database(data_dir: str = "./data") -> sqlite3.Connection:
+    conn = sqlite3.connect(":memory:")
+    cur = conn.cursor()
+    
+    # 1. Crew table
+    cur.execute("""
+        CREATE TABLE crew (
+            crew_id TEXT PRIMARY KEY,
+            name TEXT,
+            rank TEXT,
+            base TEXT,
+            ratings TEXT,
+            seniority INTEGER,
+            reachability_minutes INTEGER
+        )
+    """)
+    
+    # 2. Duty clocks table
+    cur.execute("""
+        CREATE TABLE duty_clocks (
+            crew_id TEXT PRIMARY KEY,
+            duty_hours_7d REAL,
+            flight_hours_28d REAL,
+            last_rest_ended TEXT,
+            FOREIGN KEY (crew_id) REFERENCES crew(crew_id)
+        )
+    """)
+    
+    # Ingest JSON files into SQLite
+    p = Path(data_dir)
+    with open(p / "crew.json") as f:
+        for c in json.load(f):
+            cur.execute("INSERT INTO crew VALUES (?, ?, ?, ?, ?, ?, ?)",
+                        (c["crew_id"], c["name"], c["rank"], c["base"], json.dumps(c["ratings"]), c["seniority"], c["reachability_minutes"]))
+            
+    with open(p / "duty_clocks.json") as f:
+        for d in json.load(f):
+            cur.execute("INSERT INTO duty_clocks VALUES (?, ?, ?, ?)",
+                        (d["crew_id"], d["duty_hours_7d"], d["flight_hours_28d"], d["last_rest_ended"]))
+            
+    conn.commit()
+    return conn</code></pre>
+      </div>
+
+      <!-- File 2: Deterministic 7-Rule Engine -->
+      <div class="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-lg">
+        <div class="bg-slate-950 px-5 py-3 border-b border-slate-800 flex items-center justify-between">
+          <span class="text-xs font-mono text-slate-300 font-bold">2. rules_engine.py — Deterministic 7-Rule Validator</span>
+          <button onclick="copyCodeSnippet('code-rules-block')" class="px-3 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-mono rounded">Copy Code</button>
+        </div>
+        <pre class="p-4 text-xs font-mono text-emerald-300 bg-[#070e1b] overflow-x-auto custom-scrollbar" id="code-rules-block"><code>from datetime import datetime, timedelta
+
+def get_max_fdp_hours(num_sectors: int) -> float:
+    """RULE-FDP-01: Max 13 hours, reduced by sectors."""
+    table = {1: 13.0, 2: 13.0, 3: 12.0, 4: 11.0, 5: 10.0}
+    return table.get(num_sectors, 9.0)
+
+def validate_candidate(crew: dict, clock: dict, pairing_flights: list[dict], certs: dict, duty_date: str) -> dict:
+    violated_rules = []
+    rules_checked = ["RULE-FDP-01", "RULE-DUTY-02", "RULE-FLT-03", "RULE-REST-04", "RULE-QUAL-05", "RULE-CERT-06", "RULE-BASE-07"]
+    
+    # 1. RULE-QUAL-05: Rating match
+    required_type = pairing_flights[0]["aircraft_type"]
+    if required_type not in crew["ratings"]:
+        violated_rules.append({"rule": "RULE-QUAL-05", "detail": f"Crew lacks {required_type} rating"})
+        
+    # 2. RULE-DUTY-02: 60h in 7 days
+    new_duty_hours = sum(f["block_minutes"] / 60.0 for f in pairing_flights) + 1.0 # 60m pre-briefing
+    if clock["duty_hours_7d"] + new_duty_hours > 60.0:
+        excess = (clock["duty_hours_7d"] + new_duty_hours) - 60.0
+        violated_rules.append({"rule": "RULE-DUTY-02", "detail": f"Exceeds 60h/7d limit by {excess:.1f} hours"})
+        
+    # 3. RULE-FDP-01: Max FDP by sector
+    max_fdp = get_max_fdp_hours(len(pairing_flights))
+    if new_duty_hours > max_fdp:
+        violated_rules.append({"rule": "RULE-FDP-01", "detail": f"Duty of {new_duty_hours:.1f}h exceeds max FDP of {max_fdp}h"})
+        
+    is_legal = len(violated_rules) == 0
+    return {
+        "legal": is_legal,
+        "rules_checked": rules_checked,
+        "violations": violated_rules
+    }</code></pre>
+      </div>
+
+      <!-- File 3: Tier 2 Consequence Tracer -->
+      <div class="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-lg">
+        <div class="bg-slate-950 px-5 py-3 border-b border-slate-800 flex items-center justify-between">
+          <span class="text-xs font-mono text-slate-300 font-bold">3. consequence_tracer.py — Tier 2 Ripple Engine</span>
+          <button onclick="copyCodeSnippet('code-tracer-block')" class="px-3 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-mono rounded">Copy Code</button>
+        </div>
+        <pre class="p-4 text-xs font-mono text-purple-300 bg-[#070e1b] overflow-x-auto custom-scrollbar" id="code-tracer-block"><code>def trace_disruption(conn, sick_crew_id: str, date: str) -> dict:
+    cur = conn.cursor()
+    
+    # 1. Find broken pairing
+    cur.execute("SELECT pairing_id, flight_numbers FROM rosters WHERE crew_id = ? AND date = ?", (sick_crew_id, date))
+    row = cur.fetchone()
+    if not row:
+        return {"error": "Crew not assigned to any pairing on this date"}
+        
+    pairing_id, flights_json = row[0], row[1]
+    flight_list = json.loads(flights_json)
+    
+    # 2. Count passengers affected
+    pax_total = 0
+    for f_num in flight_list:
+        cur.execute("SELECT pax_count FROM flights WHERE flight_num = ?", (f_num,))
+        pax_total += cur.fetchone()[0]
+        
+    return {
+        "uncrewed_flights": flight_list,
+        "pairing_broken": pairing_id,
+        "passengers_affected": pax_total
+    }</code></pre>
+      </div>
+    </div>
+
+    <!-- ======================================================================= -->
+    <!-- TAB 7: JUDGING RUBRIC & WINNING STRATEGY                                -->
+    <!-- ======================================================================= -->
+    <div id="view-judging" class="pb-tab-content hidden space-y-8">
+      <div class="border-b border-slate-800 pb-4">
+        <h2 class="text-2xl font-bold text-white">Evaluation Matrix & Pitch Playbook</h2>
+        <p class="text-slate-400 text-sm mt-1">Official evaluation weights from the challenge guidelines.</p>
+      </div>
+
+      <!-- Weights Breakdown -->
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
+        <div class="p-5 rounded-2xl bg-slate-900 border border-cyan-500/30 space-y-2">
+          <div class="flex items-center justify-between">
+            <span class="text-cyan-400 font-bold font-mono text-sm">20%</span>
+            <span class="text-[10px] text-slate-500 font-mono">HIGHEST WEIGHT</span>
+          </div>
+          <h4 class="text-base font-bold text-white">AI Utilization & Architecture</h4>
+          <p class="text-slate-300 leading-relaxed">
+            Is AI solving a real reasoning problem or just decorating a database lookup? How deliberately is the line drawn between LLM and deterministic Python?
+          </p>
+        </div>
+
+        <div class="p-5 rounded-2xl bg-slate-900 border border-emerald-500/30 space-y-2">
+          <div class="flex items-center justify-between">
+            <span class="text-emerald-400 font-bold font-mono text-sm">15%</span>
+            <span class="text-[10px] text-slate-500 font-mono">CORE CAPABILITY</span>
+          </div>
+          <h4 class="text-base font-bold text-white">Functionality</h4>
+          <p class="text-slate-300 leading-relaxed">
+            Does it actually work? How high up the tiers does it reliably reach without crashing or hallucinating?
+          </p>
+        </div>
+
+        <div class="p-5 rounded-2xl bg-slate-900 border border-purple-500/30 space-y-2">
+          <div class="flex items-center justify-between">
+            <span class="text-purple-400 font-bold font-mono text-sm">15%</span>
+            <span class="text-[10px] text-slate-500 font-mono">ENGINEERING</span>
+          </div>
+          <h4 class="text-base font-bold text-white">Technical Excellence</h4>
+          <p class="text-slate-300 leading-relaxed">
+            Code cleanliness, modularity, relational design, zero-dependency simplicity, and sound trade-offs.
+          </p>
+        </div>
+      </div>
+
+      <!-- Winning Rules from the Judges -->
+      <div class="p-6 rounded-3xl bg-gradient-to-br from-emerald-950/40 via-slate-900 to-cyan-950/40 border border-emerald-500/40 space-y-4">
+        <h3 class="text-lg font-bold text-white flex items-center space-x-2">
+          <i data-lucide="check-circle" class="w-5 h-5 text-emerald-400"></i>
+          <span>The 3 Golden Rules Explicitly Highlighted by the Founders:</span>
+        </h3>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
+          <div class="p-4 rounded-xl bg-slate-950 border border-slate-800 space-y-1.5">
+            <strong class="text-emerald-400 block font-mono">1. Polished T1/T2 Beats Broken T3</strong>
+            <p class="text-slate-300 leading-relaxed">A rock-solid Tier 1 lookup and credible Tier 2 ripple simulator beats a fragile, hallucinating Tier 3 attempt.</p>
+          </div>
+          <div class="p-4 rounded-xl bg-slate-950 border border-slate-800 space-y-1.5">
+            <strong class="text-cyan-400 block font-mono">2. Correctness &gt; Coverage</strong>
+            <p class="text-slate-300 leading-relaxed">Answering 10 questions correctly and honestly stating "I cannot reliably answer that" on the 11th scores higher than 11 answers with 3 wrong.</p>
+          </div>
+          <div class="p-4 rounded-xl bg-slate-950 border border-slate-800 space-y-1.5">
+            <strong class="text-amber-400 block font-mono">3. Mandatory Failure Analysis</strong>
+            <p class="text-slate-300 leading-relaxed">Include one case your system handles poorly and explain <em>why</em>. Honest failure analysis scores points; overstating capability loses points.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- ========================================================================= -->
+  <!-- FOOTER                                                                    -->
+  <!-- ========================================================================= -->
+  <footer class="border-t border-slate-800/80 bg-slate-950 py-6 text-center text-xs text-slate-500">
+    <div class="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-2">
+      <div class="flex items-center space-x-2">
+        <span class="w-2 h-2 rounded-full bg-emerald-400 pulse-dot"></span>
+        <span>dCortex Crew Ops Advisor Blueprint • Bessemer Tech Catalyst 2026</span>
+      </div>
+      <div class="font-mono text-slate-400">
+        Engineered for Airline Operations Control (OCC) System of Action
+      </div>
+    </div>
+  </footer>
+
+  <!-- ========================================================================= -->
+  <!-- JAVASCRIPT SIMULATOR & TAB LOGIC                                          -->
+  <!-- ========================================================================= -->
+  <script>
+    // Tab Switcher Logic
+    function switchPlaybookTab(tabKey) {
+      document.querySelectorAll('.pb-tab-content').forEach(el => el.classList.add('hidden'));
+      document.querySelectorAll('.pb-tab-btn').forEach(btn => {
+        btn.classList.remove('active', 'text-emerald-400', 'bg-slate-900', 'border', 'border-emerald-500/30', 'font-semibold');
+        btn.classList.add('text-slate-400');
+      });
+
+      const targetView = document.getElementById('view-' + tabKey);
+      const targetBtn = document.getElementById('tab-btn-' + tabKey);
+
+      if (targetView) targetView.classList.remove('hidden');
+      if (targetBtn) {
+        targetBtn.classList.add('active', 'text-emerald-400', 'bg-slate-900', 'border', 'border-emerald-500/30', 'font-semibold');
+        targetBtn.classList.remove('text-slate-400');
+      }
+
+      if (window.lucide && typeof lucide.createIcons === 'function') {
+        lucide.createIcons();
+      }
+    }
+
+    // Interactive Simulator Mock Database
+    const SIMULATOR_DATA = {
+      t1_duty: {
+        intent: "QUERY_DUTY_HOURS",
+        tool: "sqlite_duty_clocks(crew_id='C-1042')",
+        rules: "RULE-DUTY-02, RULE-FLT-03",
+        status: "100% Deterministic SQL Query",
+        json: {
+          "query": "How many duty hours does C-1042 have left this week?",
+          "crew_id": "C-1042",
+          "name": "Capt. A. Nair",
+          "duty_hours_used_7d": 48.5,
+          "weekly_limit": 60.0,
+          "remaining_duty_hours": 11.5,
+          "flight_hours_28d": 82.0,
+          "flight_hours_limit": 100.0,
+          "remaining_flight_hours": 18.0,
+          "status": "LEGAL"
+        },
+        explanation: "Captain A. Nair (C-1042) has accumulated 48.5 duty hours in the current 7-day rolling window against the statutory limit of 60.0 hours (RULE-DUTY-02), leaving exactly 11.5 duty hours remaining. For the 28-day window, 82.0 of 100.0 flight hours have been accrued (18.0 hours remaining under RULE-FLT-03).",
+        notification: "N/A — Query is informational only."
+      },
+      t1_reserve: {
+        intent: "QUERY_RESERVE_POOL",
+        tool: "sqlite_reserve_pool(base='BLR', date='2026-09-15')",
+        rules: "RULE-BASE-07, RULE-QUAL-05",
+        status: "100% Deterministic SQL Query",
+        json: {
+          "date": "2026-09-15",
+          "station": "BLR",
+          "available_reserves": [
+            { "crew_id": "C-3310", "name": "Capt. R. Deshmukh", "rank": "Captain", "rating": ["A320"], "standby": "HOT", "on_call": "06:00-18:00", "reachability_mins": 45 },
+            { "crew_id": "C-4102", "name": "FO K. Raman", "rank": "First Officer", "rating": ["A320"], "standby": "COLD", "on_call": "08:00-20:00", "reachability_mins": 90 }
+          ]
+        },
+        explanation: "Two crew members are available on reserve at BLR on 15 Sep: Captain C-3310 (A320-rated, Airport Hot Standby from 06:00-18:00, 45 min reachability) and First Officer C-4102 (A320-rated, Home Cold Standby from 08:00-20:00, 90 min reachability).",
+        notification: "N/A — Reserve roster lookup."
+      },
+      t1_certs: {
+        intent: "QUERY_EXPIRING_CERTS",
+        tool: "sqlite_certifications(days=30)",
+        rules: "RULE-CERT-06",
+        status: "100% Deterministic SQL Query",
+        json: {
+          "window_days": 30,
+          "flagged_crew": [
+            { "crew_id": "C-1108", "name": "FO S. Patil", "cert_type": "Class 1 Medical", "expiry_date": "2026-09-28", "days_remaining": 14 },
+            { "crew_id": "C-2091", "name": "Capt. M. Sen", "cert_type": "Recurrent A320 Sim", "expiry_date": "2026-10-02", "days_remaining": 18 }
+          ]
+        },
+        explanation: "Two crew members have certifications expiring within the next 30 days: First Officer S. Patil (Class 1 Medical expires 28 Sep) and Captain M. Sen (Recurrent Sim due 02 Oct). Per RULE-CERT-06, duty cannot be scheduled past these expiry dates without renewal.",
+        notification: "Automated Reminder Draft: 'Crew Operations Alert: FO Patil, your DGCA Class-1 Medical expires in 14 days (28 Sep). Please submit renewal endorsement.'"
+      },
+      t2_sick: {
+        intent: "SIMULATE_SICK_CALL_RIPPLE",
+        tool: "consequence_tracer(crew='C-1042', date='2026-09-15')",
+        rules: "RULE-DUTY-02, RULE-FDP-01",
+        status: "Pairing Graph Traversal",
+        json: {
+          "query": "Captain C-1042 called in sick for 15 Sep",
+          "impact": {
+            "uncrewed_flights": ["DX412", "DX413", "DX588"],
+            "pairing_broken": "P-2291",
+            "downstream_risks": [
+              { "crew_id": "C-2087", "rule": "RULE-DUTY-02", "detail": "Would exceed 60h/7d by 1h20m" }
+            ],
+            "passengers_affected": 486
+          },
+          "explanation": "C-1042 operates pairing P-2291 (DX412/413/588 on 15 Sep). All three legs are now uncrewed. The nearest substitution, C-2087, would breach the 7-day duty limit."
+        },
+        explanation: "Captain C-1042 was scheduled on rotation Pairing P-2291 consisting of three consecutive sectors on 15 Sep: DX412 (BLR-DEL), DX413 (DEL-BOM), and DX588 (BOM-BLR). With C-1042 sick, all 3 sectors are uncovered, directly impacting 486 booked passengers. A direct swap with C-2087 is non-compliant as it breaches RULE-DUTY-02 by 1h 20m.",
+        notification: "URGENT DISPATCH NOTICE: 'Pairing P-2291 uncrewed due to Captain sick call. Flight Ops & Crew Control initiating standby reserve assignment.'"
+      },
+      t2_swap: {
+        intent: "SIMULATE_CREW_SWAP",
+        tool: "simulate_swap(target_crew='C-2087', flight='DX412')",
+        rules: "RULE-DUTY-02 (VIOLATION DETECTED)",
+        status: "Exact Arithmetic Validation",
+        json: {
+          "proposed_assignment": { "crew_id": "C-2087", "flight": "DX412" },
+          "is_legal": false,
+          "violated_rules": [
+            { "rule": "RULE-DUTY-02", "limit": "60.0h / 7d", "projected": "61.33h", "breach": "+1h 20m" }
+          ],
+          "downstream_passengers": 162,
+          "verdict": "REJECTED_BY_DETERMINISTIC_GATE"
+        },
+        explanation: "Moving First Officer C-2087 onto DX412 is strictly ILLEGAL. C-2087 currently has 57.5 hours logged in the past 6 days. Adding DX412's 2h 50m block time plus 50m mandatory turn pushes cumulative duty to 61h 20m, breaching RULE-DUTY-02 by 1 hour 20 minutes.",
+        notification: "System Alert: 'Proposed swap for C-2087 on DX412 aborted: violates DGCA 60h/7d cumulative duty ceiling.'"
+      },
+      t3_action: {
+        intent: "RECOMMEND_AND_RANK_ACTIONS",
+        tool: "combinatorial_recovery_solver()",
+        rules: "RULE-FDP-01, RULE-QUAL-05, RULE-BASE-07, costs.json",
+        status: "Cost-Optimized & Rule-Compliant",
+        json: {
+          "options": [
+            {
+              "rank": 1,
+              "action": "Assign reserve C-3310",
+              "legal": true,
+              "rules_checked": ["RULE-FDP-01", "RULE-QUAL-05", "RULE-BASE-07"],
+              "cost_inr": 18500,
+              "coverage": "all 3 flights",
+              "reasoning": "BLR-based, A320-rated, on-call 06:00-18:00, reachable in 45 min."
+            },
+            {
+              "rank": 2,
+              "action": "Deadhead C-2210 from DEL",
+              "legal": true,
+              "cost_inr": 41200,
+              "coverage": "all 3 flights",
+              "reasoning": "Legal but incurs deadhead cost and 3h delay to DX412."
+            }
+          ]
+        },
+        explanation: "Rank 1 (Optimal): Call out BLR Hot Reserve Captain C-3310. Fully compliant with all 7 rules, covers all 3 legs without flight delays, and incurs only base callout cost (₹18,500). Rank 2: Reposition Captain C-2210 via passenger seat (deadhead) from Delhi. Compliant but incurs ₹41,200 ticket cost and forces a 3-hour delay on DX412.",
+        notification: "Automated SMS to C-3310: 'Hello Capt. Deshmukh, Crew Control dispatch for 15 Sep. Assigned to Pairing P-2291 (DX412/413/588). Report to BLR Gate 4 by 07:15 IST. Please confirm acceptance.'"
+      }
+    };
+
+    function loadSimQuery() {
+      runSolverSimulation();
+    }
+
+    function runSolverSimulation() {
+      const selectedKey = document.getElementById('sim-query-selector').value;
+      const data = SIMULATOR_DATA[selectedKey] || SIMULATOR_DATA.t1_duty;
+
+      document.getElementById('trace-intent-val').textContent = data.intent;
+      document.getElementById('trace-tool-val').textContent = data.tool;
+      document.getElementById('trace-rule-val').textContent = data.rules;
+      document.getElementById('trace-status-val').textContent = data.status;
+
+      document.getElementById('solver-json-output').textContent = JSON.stringify(data.json, null, 2);
+      document.getElementById('solver-explanation-output').textContent = data.explanation;
+      document.getElementById('solver-notification-draft').textContent = data.notification;
+    }
+
+    function copyCodeSnippet(elementId) {
+      const el = document.getElementById(elementId);
+      if (!el) return;
+      const text = el.innerText || el.textContent;
+      const temp = document.createElement('textarea');
+      temp.value = text;
+      document.body.appendChild(temp);
+      temp.select();
+      document.execCommand('copy');
+      document.body.removeChild(temp);
+
+      const toast = document.createElement('div');
+      toast.className = 'fixed bottom-6 right-6 bg-emerald-500 text-slate-950 font-bold px-4 py-2.5 rounded-xl shadow-2xl text-xs z-50 transition-all';
+      toast.textContent = '✓ Copied to clipboard!';
+      document.body.appendChild(toast);
+      setTimeout(() => toast.remove(), 2500);
+    }
+
+    // Initialize simulator on load
+    document.addEventListener('DOMContentLoaded', () => {
+      if (window.lucide && typeof lucide.createIcons === 'function') {
+        lucide.createIcons();
+      }
+      runSolverSimulation();
+    });
+  </script>
+</body>
+</html>
