@@ -1,5 +1,5 @@
 # Generated database (rebuilt from data/*.json on startup — do not commit)
-crew_ops.db
+crew_ops.db*
 
 # Python
 __pycache__/
