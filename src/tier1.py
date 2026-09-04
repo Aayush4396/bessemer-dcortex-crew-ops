@@ -6,34 +6,39 @@ Tier 1 Deterministic Query Handlers for dCortex Crew Ops Advisor.
 All functions execute hand-written, parameterized SQLite queries with ZERO LLM
 involvement. The LLM acts purely as a caller / router.
 
-The 9 Canonical Handlers covering 100% of tables & benchmark lookups (Q01-Q16):
--------------------------------------------------------------------------------
-1. get_reserves_at_station(station, date, conn=None)
-   -> Q01: Active reserve standby crew with on-call windows and rank.
+Canonical Operational Handlers:
+-------------------------------
+1. get_reserves_at_station(station=None, date=None, rank=None, conn=None)
+   -> Active reserve standby crew with on-call windows, rank, and active status.
 
-2. get_crew_duty_balance(crew_id, as_of_date="2026-09-14", conn=None)
-   -> Q02, Q13: Rolling 7d duty, 28d flight hours, headroom against 60h cap, rank.
+2. get_crew_duty_balance(crew_id, as_of_date=None, conn=None)
+   -> Rolling 7d duty hours, 28d flight hours, headroom against 60h/100h caps, and rank.
+   Accurately computes across historical duty_clock_history AND planned pairings.
 
 3. get_departures(station, date, start_time=None, end_time=None, conn=None)
-   -> Q03: Flights departing a station on a given date within optional time window.
+   -> Flights departing an airport on a given date within optional time window.
 
-4. get_expiring_certifications(as_of_date="2026-09-15", days_ahead=30, conn=None)
-   -> Q04: Certifications expiring within [as_of_date, as_of_date + days_ahead].
+4. get_arrivals(station, date, start_time=None, end_time=None, conn=None)
+   -> Inbound flights arriving at an airport on a given date within optional time window.
 
-5. get_flights(date=None, origin=None, destination=None, flight_no=None, aircraft=None, distinct_destinations=False, conn=None)
-   -> Q05, Q09, Q10, Q14: Flexible flight search (leg lookup, city pairs, daily counts, nonstop destinations).
+5. get_expiring_certifications(as_of_date="2026-09-15", days_ahead=30, cert_type=None, crew_id=None, conn=None)
+   -> Certifications expiring within a sliding calendar window [as_of_date, as_of_date + days_ahead].
 
-6. get_flight_schedule_stats(metric="longest_block", conn=None)
-   -> Q12: Computes schedule statistics like longest block duration and matching flights.
+6. get_flights(date=None, origin=None, destination=None, flight_no=None, aircraft=None, aircraft_type=None, distinct_destinations=False, count_only=False, conn=None)
+   -> Flexible flight search (leg lookup, city pairs, daily counts, nonstop destinations).
 
-7. get_crew_profile(crew_id=None, rank=None, base=None, conn=None)
-   -> Q06, Q07, Q11: Base, ratings, reachability, reserve standby window, crew by station.
+7. get_flight_schedule_stats(metric="longest_block", conn=None)
+   -> Computes schedule statistics like longest/shortest block duration and matching flights.
 
-8. get_pairing_roster(pairing_id=None, aircraft=None, date=None, role=None, conn=None)
-   -> Q08, Q15: Assigned crew complement and roles for a pairing or aircraft/date assignment.
+8. get_crew_profile(crew_id=None, rank=None, base=None, rating=None, status=None, conn=None)
+   -> Base, ratings, reachability, reserve standby window, crew by station.
 
-9. get_crew_risk_signal(crew_id, conn=None)
-   -> Q16: Pre-computed disruption risk score and driver tags from risk_signals table.
+9. get_pairing_roster(pairing_id=None, crew_id=None, aircraft=None, date=None, role=None, conn=None)
+   -> Assigned crew complement and roles for a pairing or aircraft/date assignment,
+   plus reverse lookup of a crew member's rostered pairings.
+
+10. get_crew_risk_signal(crew_id=None, min_score=None, conn=None)
+    -> Pre-computed disruption risk score and driver tags from risk_signals table.
 """
 
 import json
@@ -41,6 +46,10 @@ import sqlite3
 from datetime import date, timedelta
 from pathlib import Path
 from typing import Any
+
+from src.rules.config import DUTY_MAX_HOURS, DUTY_WINDOW_DAYS, FLT_MAX_HOURS, FLT_WINDOW_DAYS
+from src.rules.models import SNAPSHOT_DATE
+from src.rules.time_utils import calculate_rolling_sum
 
 _DEFAULT_DB_PATH = Path(__file__).parent.parent / "crew_ops.db"
 
@@ -55,11 +64,12 @@ def _get_conn(conn: sqlite3.Connection | None = None) -> sqlite3.Connection:
 
 
 # ---------------------------------------------------------------------------
-# 1. get_reserves_at_station (Q01)
+# 1. get_reserves_at_station
 # ---------------------------------------------------------------------------
 def get_reserves_at_station(
-    station: str,
-    date: str,
+    station: str | None = None,
+    date: str | None = None,
+    rank: str | None = None,
     conn: sqlite3.Connection | None = None,
 ) -> list[dict[str, Any]]:
     """
@@ -69,10 +79,13 @@ def get_reserves_at_station(
 
     Parameters
     ----------
-    station : str
-        IATA code, e.g. "BLR"
-    date : str
-        ISO date "YYYY-MM-DD", e.g. "2026-09-15"
+    station : str, optional
+        IATA code, e.g. "BLR". If None, returns reserves across all stations.
+    date : str, optional
+        ISO date "YYYY-MM-DD", e.g. "2026-09-15".
+    rank : str, optional
+        Filter by crew rank, e.g. "Captain" or "First Officer".
+    conn : sqlite3.Connection, optional
 
     Returns
     -------
@@ -83,16 +96,28 @@ def get_reserves_at_station(
     }
     """
     c = _get_conn(conn)
-    query = """
+    conditions = ["c.status = 'active'"]
+    params: list[Any] = []
+
+    if station:
+        conditions.append("rp.base = ?")
+        params.append(station)
+    if date:
+        conditions.append("rp.date = ?")
+        params.append(date)
+    if rank:
+        conditions.append("c.rank = ?")
+        params.append(rank)
+
+    where_clause = " WHERE " + " AND ".join(conditions)
+    query = f"""
         SELECT rp.crew_id, c.rank, rp.on_call_start, rp.on_call_end
         FROM reserve_pool rp
         JOIN crew c ON c.crew_id = rp.crew_id
-        WHERE rp.base = ?
-          AND rp.date = ?
-          AND c.status = 'active'
+        {where_clause}
         ORDER BY rp.id ASC
     """
-    rows = c.execute(query, (station, date)).fetchall()
+    rows = c.execute(query, tuple(params)).fetchall()
     return [
         {
             "crew_id": r["crew_id"],
@@ -107,7 +132,7 @@ def get_reserves_at_station(
 
 
 # ---------------------------------------------------------------------------
-# 2. get_crew_duty_balance (Q02, Q13)
+# 2. get_crew_duty_balance
 # ---------------------------------------------------------------------------
 def get_crew_duty_balance(
     crew_id: str,
@@ -116,8 +141,8 @@ def get_crew_duty_balance(
 ) -> dict[str, Any]:
     """
     Computes exact accrued rolling 7-day duty hours, 28-day flight hours,
-    and remaining headroom against the 60h cap under RULE-DUTY-02.
-    Also returns crew rank and ratings.
+    and remaining headroom against the 60h duty cap (RULE-DUTY-02) and 100h flight cap (RULE-FLT-03).
+    Accurately combines historical records (<= 2026-09-14) AND planned roster pairings (> 2026-09-14).
 
     Parameters
     ----------
@@ -146,36 +171,21 @@ def get_crew_duty_balance(
     ).fetchone()
     rank = crew_row["rank"] if crew_row else None
 
-    # Calculate 7-day window [end - 6 days, end]
     end_dt = date.fromisoformat(as_of_date)
-    start_7d = end_dt - timedelta(days=6)
-    r7 = c.execute(
-        """
-        SELECT COALESCE(SUM(duty_hours), 0.0)
-        FROM duty_clock_history
-        WHERE crew_id = ?
-          AND date >= ?
-          AND date <= ?
-        """,
-        (crew_id, start_7d.isoformat(), end_dt.isoformat()),
-    ).fetchone()
-    duty_7d = round(float(r7[0]), 2)
-    duty_headroom = round(max(0.0, 60.0 - duty_7d), 2)
 
-    # Calculate 28-day window [end - 27 days, end]
-    start_28d = end_dt - timedelta(days=27)
-    r28 = c.execute(
-        """
-        SELECT COALESCE(SUM(flight_hours), 0.0)
-        FROM duty_clock_history
-        WHERE crew_id = ?
-          AND date >= ?
-          AND date <= ?
-        """,
-        (crew_id, start_28d.isoformat(), end_dt.isoformat()),
-    ).fetchone()
-    flight_28d = round(float(r28[0]), 2)
-    flight_headroom = round(max(0.0, 100.0 - flight_28d), 2)
+    # Calculate 7-day rolling duty hours and headroom
+    duty_7d = round(
+        calculate_rolling_sum(c, crew_id, end_dt, DUTY_WINDOW_DAYS, "duty_hours"),
+        2,
+    )
+    duty_headroom = round(max(0.0, DUTY_MAX_HOURS - duty_7d), 2)
+
+    # Calculate 28-day rolling flight hours and headroom
+    flight_28d = round(
+        calculate_rolling_sum(c, crew_id, end_dt, FLT_WINDOW_DAYS, "flight_hours"),
+        2,
+    )
+    flight_headroom = round(max(0.0, FLT_MAX_HOURS - flight_28d), 2)
 
     return {
         "crew_id": crew_id,
@@ -189,7 +199,7 @@ def get_crew_duty_balance(
 
 
 # ---------------------------------------------------------------------------
-# 3. get_departures (Q03)
+# 3. get_departures
 # ---------------------------------------------------------------------------
 def get_departures(
     station: str,
@@ -239,15 +249,53 @@ def get_departures(
 
 
 # ---------------------------------------------------------------------------
-# 4. get_expiring_certifications (Q04)
+# 4. get_arrivals
+# ---------------------------------------------------------------------------
+def get_arrivals(
+    station: str,
+    date: str,
+    start_time: str | None = None,
+    end_time: str | None = None,
+    conn: sqlite3.Connection | None = None,
+) -> list[str]:
+    """
+    List flight numbers arriving at a station on a given date, optionally
+    within a specific arrival time window.
+    """
+    c = _get_conn(conn)
+    query = """
+        SELECT flight_no, arr_utc
+        FROM flights
+        WHERE arr_station = ?
+          AND date = ?
+        ORDER BY arr_utc ASC
+    """
+    rows = c.execute(query, (station, date)).fetchall()
+
+    result = []
+    for r in rows:
+        arr_time = r["arr_utc"][11:16]
+        if start_time and arr_time < start_time:
+            continue
+        if end_time and arr_time > end_time:
+            continue
+        result.append(r["flight_no"])
+    return result
+
+
+# ---------------------------------------------------------------------------
+# 5. get_expiring_certifications
 # ---------------------------------------------------------------------------
 def get_expiring_certifications(
     as_of_date: str = "2026-09-15",
     days_ahead: int = 30,
+    cert_type: str | None = None,
+    crew_id: str | None = None,
     conn: sqlite3.Connection | None = None,
 ) -> list[dict[str, str]]:
     """
     List all certifications expiring within [as_of_date, as_of_date + days_ahead].
+    Optionally filter by certification type or crew member.
 
     Parameters
     ----------
@@ -255,6 +303,10 @@ def get_expiring_certifications(
         Starting date "YYYY-MM-DD", default "2026-09-15"
     days_ahead : int
         Window duration in calendar days, default 30
+    cert_type : str, optional
+        Filter by cert type: "licence", "medical_class1", "recurrent_training", "dangerous_goods"
+    crew_id : str, optional
+        Filter by crew ID, e.g. "C-2087"
 
     Returns
     -------
@@ -268,14 +320,24 @@ def get_expiring_certifications(
     start_dt = date.fromisoformat(as_of_date)
     end_dt = start_dt + timedelta(days=days_ahead)
 
-    query = """
+    conditions = ["valid_to >= ?", "valid_to <= ?"]
+    params: list[Any] = [start_dt.isoformat(), end_dt.isoformat()]
+
+    if cert_type:
+        conditions.append("cert_type = ?")
+        params.append(cert_type)
+    if crew_id:
+        conditions.append("crew_id = ?")
+        params.append(crew_id)
+
+    where_clause = " WHERE " + " AND ".join(conditions)
+    query = f"""
         SELECT crew_id, cert_type, valid_to
         FROM certifications
-        WHERE valid_to >= ?
-          AND valid_to <= ?
-        ORDER BY id ASC
+        {where_clause}
+        ORDER BY valid_to ASC, crew_id ASC
     """
-    rows = c.execute(query, (start_dt.isoformat(), end_dt.isoformat())).fetchall()
+    rows = c.execute(query, tuple(params)).fetchall()
     return [
         {
             "crew_id": r["crew_id"],
@@ -287,7 +349,7 @@ def get_expiring_certifications(
 
 
 # ---------------------------------------------------------------------------
-# 5. get_flights (Q05, Q09, Q10, Q14)
+# 6. get_flights
 # ---------------------------------------------------------------------------
 def get_flights(
     date: str | None = None,
@@ -295,7 +357,9 @@ def get_flights(
     destination: str | None = None,
     flight_no: str | None = None,
     aircraft: str | None = None,
+    aircraft_type: str | None = None,
     distinct_destinations: bool = False,
+    count_only: bool = False,
     conn: sqlite3.Connection | None = None,
 ) -> list[dict[str, Any]] | list[str] | int:
     """
@@ -304,10 +368,10 @@ def get_flights(
 
     Examples
     --------
-    - Q05: get_flights(date="2026-09-15", flight_no="DX412")
-    - Q09: get_flights(date="2026-09-17", origin="BLR", destination="BOM")
-    - Q10: get_flights(date="2026-09-16") -> can count results or filter
-    - Q14: get_flights(origin="BLR", distinct_destinations=True)
+    - Leg lookup: get_flights(date="2026-09-15", flight_no="DX412")
+    - City pair: get_flights(date="2026-09-17", origin="BLR", destination="BOM")
+    - Fleet type: get_flights(date="2026-09-16", aircraft_type="ATR72")
+    - Destinations: get_flights(origin="BLR", distinct_destinations=True)
     """
     c = _get_conn(conn)
 
@@ -339,8 +403,16 @@ def get_flights(
     if aircraft:
         conditions.append("aircraft = ?")
         params.append(aircraft)
+    if aircraft_type:
+        conditions.append("aircraft_type = ?")
+        params.append(aircraft_type)
 
     where_clause = " WHERE " + " AND ".join(conditions) if conditions else ""
+
+    if count_only:
+        query = f"SELECT COUNT(*) FROM flights {where_clause}"
+        return int(c.execute(query, tuple(params)).fetchone()[0])
+
     query = f"""
         SELECT flight_id, flight_no, date, dep_station, arr_station,
                dep_utc, arr_utc, block_hours, aircraft, aircraft_type, seats
@@ -368,7 +440,7 @@ def get_flights(
 
 
 # ---------------------------------------------------------------------------
-# 6. get_flight_schedule_stats (Q12)
+# 7. get_flight_schedule_stats
 # ---------------------------------------------------------------------------
 def get_flight_schedule_stats(
     metric: str = "longest_block",
@@ -380,7 +452,7 @@ def get_flight_schedule_stats(
     Parameters
     ----------
     metric : str
-        Currently supports "longest_block"
+        Supports "longest_block", "shortest_block"
 
     Returns
     -------
@@ -404,27 +476,44 @@ def get_flight_schedule_stats(
             "block_hours": float(max_b),
             "flights": [r["flight_no"] for r in rows],
         }
+    elif metric == "shortest_block":
+        min_b = c.execute("SELECT MIN(block_hours) FROM flights").fetchone()[0]
+        rows = c.execute(
+            """
+            SELECT DISTINCT flight_no
+            FROM flights
+            WHERE block_hours = ?
+            ORDER BY flight_no ASC
+            """,
+            (min_b,),
+        ).fetchall()
+        return {
+            "block_hours": float(min_b),
+            "flights": [r["flight_no"] for r in rows],
+        }
     raise ValueError(f"Unknown metric {metric!r}")
 
 
 # ---------------------------------------------------------------------------
-# 7. get_crew_profile (Q06, Q07, Q11)
+# 8. get_crew_profile
 # ---------------------------------------------------------------------------
 def get_crew_profile(
     crew_id: str | None = None,
     rank: str | None = None,
     base: str | None = None,
+    rating: str | None = None,
+    status: str | None = None,
     conn: sqlite3.Connection | None = None,
 ) -> list[dict[str, Any]] | dict[str, Any] | None:
     """
     Fetch crew member details including base, ratings, reachability minutes,
-    reserve on-call standby window (if on reserve), or list crew IDs by rank/base.
+    reserve on-call standby window (if on reserve), or list crew IDs by rank/base/rating.
 
     Examples
     --------
-    - Q06: get_crew_profile(crew_id="C-3310") -> reachability & reserve window
-    - Q07: get_crew_profile(crew_id="C-2210") -> base & ratings
-    - Q11: get_crew_profile(rank="Captain", base="DEL") -> crew list
+    - Single crew: get_crew_profile(crew_id="C-3310") -> reachability & reserve window
+    - Base & ratings: get_crew_profile(crew_id="C-2210") -> base & ratings
+    - Fleet & station filter: get_crew_profile(rank="Captain", base="DEL") -> crew list
     """
     c = _get_conn(conn)
 
@@ -470,7 +559,7 @@ def get_crew_profile(
             "window": window,
         }
 
-    # Filter by rank and/or base
+    # Filter by rank, base, rating, status
     conditions = []
     params: list[Any] = []
     if rank:
@@ -479,6 +568,12 @@ def get_crew_profile(
     if base:
         conditions.append("base = ?")
         params.append(base)
+    if rating:
+        conditions.append("ratings LIKE ?")
+        params.append(f'%"{rating}"%')
+    if status:
+        conditions.append("status = ?")
+        params.append(status)
 
     where_clause = " WHERE " + " AND ".join(conditions) if conditions else ""
     query = f"""
@@ -503,25 +598,57 @@ def get_crew_profile(
 
 
 # ---------------------------------------------------------------------------
-# 8. get_pairing_roster (Q08, Q15)
+# 9. get_pairing_roster
 # ---------------------------------------------------------------------------
 def get_pairing_roster(
     pairing_id: str | None = None,
+    crew_id: str | None = None,
     aircraft: str | None = None,
     date: str | None = None,
     role: str | None = None,
     conn: sqlite3.Connection | None = None,
-) -> list[dict[str, str]] | str | None:
+) -> list[dict[str, Any]] | str | None:
     """
-    Look up assigned crew members and roles for a pairing or aircraft assignment.
+    Look up assigned crew members and roles for a pairing or aircraft assignment,
+    or reverse look up which pairings/flights a specific crew member is rostered on.
 
     Examples
     --------
-    - Q08: get_pairing_roster(pairing_id="P-2291")
-    - Q15: get_pairing_roster(aircraft="VT-DXB", date="2026-09-16", role="Senior Cabin Crew")
+    - Pairing roster: get_pairing_roster(pairing_id="P-2291")
+    - Role lookup: get_pairing_roster(aircraft="VT-DXB", date="2026-09-16", role="Senior Cabin Crew")
+    - Reverse crew lookup: get_pairing_roster(crew_id="C-1042", date="2026-09-15")
     """
     c = _get_conn(conn)
 
+    # 1. Reverse lookup: pairings assigned to a crew member
+    if crew_id:
+        query = """
+            SELECT p.pairing_id, p.aircraft, p.date, p.report_utc, p.release_utc,
+                   p.flights_json, pc.role
+            FROM pairings p
+            JOIN pairing_crew pc ON p.pairing_id = pc.pairing_id
+            WHERE pc.crew_id = ?
+        """
+        params: list[Any] = [crew_id]
+        if date:
+            query += " AND p.date = ?"
+            params.append(date)
+        query += " ORDER BY p.date ASC, p.report_utc ASC"
+        rows = c.execute(query, tuple(params)).fetchall()
+        return [
+            {
+                "pairing_id": r["pairing_id"],
+                "aircraft": r["aircraft"],
+                "date": r["date"],
+                "report_utc": r["report_utc"],
+                "release_utc": r["release_utc"],
+                "flights": json.loads(r["flights_json"]),
+                "role": r["role"],
+            }
+            for r in rows
+        ]
+
+    # 2. Roster for a specific pairing ID
     if pairing_id:
         rows = c.execute(
             """
@@ -534,6 +661,7 @@ def get_pairing_roster(
         ).fetchall()
         return [{"crew_id": r["crew_id"], "role": r["role"]} for r in rows]
 
+    # 3. Roster by aircraft and date
     if aircraft and date:
         query = """
             SELECT pc.crew_id, pc.role
@@ -542,7 +670,7 @@ def get_pairing_roster(
             WHERE p.aircraft = ?
               AND p.date = ?
         """
-        params: list[Any] = [aircraft, date]
+        params = [aircraft, date]
         if role:
             query += " AND pc.role = ?"
             params.append(role)
@@ -557,40 +685,61 @@ def get_pairing_roster(
 
 
 # ---------------------------------------------------------------------------
-# 9. get_crew_risk_signal (Q16)
+# 10. get_crew_risk_signal
 # ---------------------------------------------------------------------------
 def get_crew_risk_signal(
-    crew_id: str,
+    crew_id: str | None = None,
+    min_score: float | None = None,
     conn: sqlite3.Connection | None = None,
-) -> dict[str, Any] | None:
+) -> dict[str, Any] | list[dict[str, Any]] | None:
     """
-    Retrieve the pre-computed disruption risk score and driver tags for a crew member.
+    Retrieve pre-computed disruption risk score and driver tags for a crew member,
+    or list all crew members with risk score >= min_score.
 
     Parameters
     ----------
-    crew_id : str
+    crew_id : str, optional
         e.g. "C-1042"
+    min_score : float, optional
+        Threshold to filter high-risk crew members (e.g. 0.70)
 
     Returns
     -------
-    dict:
-        "crew_id": str,
-        "score": float,
-        "drivers": list of str
+    dict (for single crew) or list of dicts (for multi-crew query)
     """
     c = _get_conn(conn)
-    row = c.execute(
-        """
-        SELECT disruption_risk_score, drivers_json
-        FROM risk_signals
-        WHERE crew_id = ?
-        """,
-        (crew_id,),
-    ).fetchone()
-    if not row:
-        return None
-    return {
-        "crew_id": crew_id,
-        "score": round(float(row["disruption_risk_score"]), 2),
-        "drivers": json.loads(row["drivers_json"]),
-    }
+
+    if crew_id:
+        row = c.execute(
+            """
+            SELECT disruption_risk_score, drivers_json
+            FROM risk_signals
+            WHERE crew_id = ?
+            """,
+            (crew_id,),
+        ).fetchone()
+        if not row:
+            return None
+        return {
+            "crew_id": crew_id,
+            "score": round(float(row["disruption_risk_score"]), 2),
+            "drivers": json.loads(row["drivers_json"]),
+        }
+
+    # Query all crew matching min_score
+    query = "SELECT crew_id, disruption_risk_score, drivers_json FROM risk_signals"
+    params = []
+    if min_score is not None:
+        query += " WHERE disruption_risk_score >= ?"
+        params.append(min_score)
+    query += " ORDER BY disruption_risk_score DESC, crew_id ASC"
+
+    rows = c.execute(query, tuple(params)).fetchall()
+    return [
+        {
+            "crew_id": r["crew_id"],
+            "score": round(float(r["disruption_risk_score"]), 2),
+            "drivers": json.loads(r["drivers_json"]),
+        }
+        for r in rows
+    ]
