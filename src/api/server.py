@@ -15,6 +15,8 @@ from pydantic import BaseModel, Field
 from src.agent import run_crew_ops_agent
 from src.rules.models import SNAPSHOT_DATE
 from src.tier1.connection import get_connection
+from src.tier1.entity_detail import get_crew_detail, get_flight_detail, list_crew
+from src.tier1.pairings_workspace import get_pairing, get_pairings_workspace
 
 app = FastAPI(
     title="dCortex Crew Operations Advisor API",
@@ -95,6 +97,88 @@ def get_fleet_stats():
         active_stations=["BLR", "BOM", "DEL"],
         fleet_types=["A320 (162 seats)", "ATR72 (72 seats)"],
     )
+
+
+@app.get("/api/pairings")
+def list_pairings_workspace(
+    date: str | None = None,
+    aircraft: str | None = None,
+    risk: str | None = "all",
+):
+    """
+    Tactical Pairings Roster payload for the Pairings Workspace UI.
+
+    Joins pairings → flights → pairing_crew → crew → risk_signals and
+    derives pairing risk as the max assigned-crew disruption score.
+    """
+    allowed_risk = {None, "", "all", "high", "elevated", "low"}
+    if risk not in allowed_risk:
+        raise HTTPException(status_code=400, detail="risk must be all, high, elevated, or low")
+
+    try:
+        return get_pairings_workspace(
+            date_filter=date,
+            aircraft=aircraft,
+            risk=None if risk in (None, "", "all") else risk,
+        )
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Pairings query error: {exc}") from exc
+
+
+@app.get("/api/pairings/{pairing_id}")
+def get_pairing_detail(pairing_id: str):
+    """Full pairing payload for the pairing detail page."""
+    try:
+        pairing = get_pairing(pairing_id)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Pairings query error: {exc}") from exc
+    if pairing is None:
+        raise HTTPException(status_code=404, detail=f"Pairing {pairing_id} not found")
+    return pairing
+
+
+@app.get("/api/crew")
+def list_crew_endpoint(
+    rank: str | None = None,
+    base: str | None = None,
+    risk: str | None = "all",
+):
+    """Crew Management roster."""
+    allowed_risk = {None, "", "all", "high", "elevated", "low"}
+    if risk not in allowed_risk:
+        raise HTTPException(status_code=400, detail="risk must be all, high, elevated, or low")
+    try:
+        return list_crew(
+            rank=rank,
+            base=base,
+            risk=None if risk in (None, "", "all") else risk,
+        )
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Crew query error: {exc}") from exc
+
+
+@app.get("/api/flights/{flight_id}")
+def get_flight_detail_endpoint(flight_id: str):
+    """Full flight payload for the flight detail page."""
+    try:
+        flight = get_flight_detail(flight_id)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Flight query error: {exc}") from exc
+    if flight is None:
+        raise HTTPException(status_code=404, detail=f"Flight {flight_id} not found")
+    return flight
+
+
+@app.get("/api/crew/{crew_id}")
+def get_crew_detail_endpoint(crew_id: str):
+    """Full crew payload for the crew detail page."""
+    try:
+        crew = get_crew_detail(crew_id)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Crew query error: {exc}") from exc
+    if crew is None:
+        raise HTTPException(status_code=404, detail=f"Crew {crew_id} not found")
+    return crew
 
 
 @app.post("/api/chat", response_model=ChatResponse)
