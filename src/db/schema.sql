@@ -169,3 +169,36 @@ CREATE TABLE IF NOT EXISTS risk_signals (
     disruption_risk_score REAL NOT NULL,
     drivers_json          TEXT NOT NULL    -- JSON array e.g. '["short-rest pattern"]'
 );
+
+-- ---------------------------------------------------------------------------
+-- 10. chat_sessions
+--     Tracks multi-turn operational conversation sessions.
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS chat_sessions (
+    session_id  TEXT PRIMARY KEY,
+    title       TEXT NOT NULL,
+    tier        INTEGER NOT NULL DEFAULT 1,
+    created_at  TEXT NOT NULL,
+    updated_at  TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_cs_updated_at ON chat_sessions(updated_at DESC);
+
+-- ---------------------------------------------------------------------------
+-- 11. chat_messages
+--     Full uncompacted audit log of all user prompts, assistant answers,
+--     tool calls, and SQLite results.
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS chat_messages (
+    message_id      TEXT PRIMARY KEY,
+    session_id      TEXT NOT NULL REFERENCES chat_sessions(session_id) ON DELETE CASCADE,
+    sender          TEXT NOT NULL,          -- 'user' | 'assistant'
+    content         TEXT NOT NULL,
+    tier_used       INTEGER NOT NULL DEFAULT 1,
+    tool_calls      TEXT,                   -- JSON array string
+    tool_results    TEXT,                   -- JSON array string
+    reasoning_trace TEXT,                   -- JSON array string
+    created_at      TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_cm_session_created ON chat_messages(session_id, created_at ASC);
