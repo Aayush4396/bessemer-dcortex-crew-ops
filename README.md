@@ -8,9 +8,13 @@
 ## 🌟 Key Highlights & Core Philosophy
 
 - **Zero Hallucination / Zero LLM Math**: LLMs should never calculate flight duty time, rest hours, or evaluate compliance through internal arithmetic. All duty calculations, FDP limits, and legality audits are executed **deterministically in Python** against a normalized **SQLite database**.
-- **Multi-Turn Agentic ReAct Loop**: Powered by **Sarvam-105B** orchestrated via **LangGraph StateGraph**, supporting multi-hop cascading tool calls (e.g. roster lookup $\to$ crew profile discovery) with complete auditability.
+- **The Three Complete Operational Tiers**:
+  - **Tier 1 (Lookups)**: Instant deterministic operational queries for flight movements, crew rosters, standby reserve pools, and rolling duty balances.
+  - **Tier 2 (Disruption Simulator)**: Consequence simulator projecting cascading delays, airport curfews (BLR fog), uncrewed sectors, seats at risk, and DGCA FDP breaches (Scenarios S1–S6).
+  - **Tier 3 (Recovery Optimizer)**: Cost-optimal candidate ranker discovering legal covers across active reserves and day-offs, calculating exact INR costs, solving joint multi-crew disruptions, and generating structured dispatch callouts.
+- **Multi-Turn Agentic ReAct Loop**: Powered by **Sarvam-105B** orchestrated via **LangGraph StateGraph**, binding to **13 deterministic Python tools** with Option A pre-processing (<0.1ms compaction) and coreference pronoun resolution.
 - **DGCA CAR Legality Rules Engine**: Full programmatic implementation of CAR Section 7 Series J (Tables A & B, 2-pilot and 3-pilot FDP, night duty, WOCL landing caps, cumulative duty/flight clocks, split duty rest credits, and base geometry).
-- **Full Operational Console**: High-performance glassmorphic UI built with **React 18 + Tailwind CSS + Vite**, featuring real-time fleet KPI metrics, interactive chat, and a collapsible explainability drawer detailing reasoning traces, tool dispatches, and raw SQLite payloads.
+- **Full NOC Operations Desk**: High-performance console built with **React 19 + Vite + Tailwind CSS**, featuring an interactive Pairings Workspace, KPI metric cards, Crew Directory, Flight & Crew 360 detail pages, and a collapsible explainability drawer with raw SQLite payloads.
 
 ---
 
@@ -18,20 +22,25 @@
 
 ```mermaid
 flowchart TD
-    subgraph UI["Frontend Console (React + Tailwind CSS)"]
-        A[Crew Controller Input] --> B[Interactive Chat Console]
-        B --> C[Explainability Drawer: Trace / Tools / SQL]
+    subgraph UI["Frontend Console (React 19 + Tailwind CSS + Vite)"]
+        A[Crew Controller Input] --> B[Interactive Chat Console / Copilot]
+        W[Tactical Pairings Workspace] --> C[Audit Drawer: Trace / Tools / SQL]
     end
 
-    subgraph API["FastAPI Backend (REST Service)"]
+    subgraph API["FastAPI Backend (Port 8000)"]
         D["/api/chat"]
         E["/api/stats"]
         F["/api/health"]
+        P["/api/pairings"]
+        CR["/api/crew"]
+        FL["/api/flights"]
+        SIM["/api/simulate (Tier 2 Simulator)"]
+        REC["/api/recover (Tier 3 Optimizer)"]
     end
 
     subgraph Agent["LangGraph ReAct Agent (Sarvam-105B)"]
         G[Agent Node: Sarvam-105B]
-        H[Tools Node: Deterministic Execution]
+        H[Tools Node: 13 Deterministic Tools]
         I{Should Continue?}
         G -->|Tool Calls| I
         I -->|Tools Needed| H
@@ -40,16 +49,19 @@ flowchart TD
     end
 
     subgraph Core["Deterministic Execution Layer (Zero LLM Math)"]
-        K[(SQLite Database: 9 Tables)]
-        L[DGCA CAR Rules Engine]
-        M[Tier 1 Query Handlers]
+        K[(SQLite Database: 11 Tables in WAL Mode)]
+        L[DGCA CAR Rules Engine: 7 Programmatic Rules]
+        M[Tier 1 Query Handlers & Workspace Engines]
+        N[Tier 2 Disruption Consequence Simulator]
+        O[Tier 3 Recovery Optimizer & Financial Costing]
     end
 
-    B -->|POST /api/chat| D
-    D --> G
-    H --> M
-    M --> K
-    M --> L
+    B -->|POST /api/chat| D --> G
+    W -->|GET /api/pairings| P --> M --> K
+    SIM --> N --> K & L
+    REC --> O --> K & L
+    H --> M & N & O
+    M & N & O --> K & L
     J --> B
 ```
 
@@ -60,17 +72,17 @@ flowchart TD
 | Tier | Capability | Status | Description |
 | :--- | :--- | :---: | :--- |
 | **Tier 1** | **Deterministic Operational Lookup** | ✅ Production Ready | Instant natural language queries for pairings, crew profiles, duty balances, flight details, reserve pools, risk signals, and expiring certifications. |
-| **Tier 2** | **Disruption Consequence Simulator** | 🚧 Step 5 Foundation | Simulates cascading disruption impacts (delays, airport curfews, crew FDP breach, illegal groundings) across Scenarios S1–S6. |
-| **Tier 3** | **Recovery Optimizer & Crew Swapper** | 🚧 Step 6 Foundation | Evaluates replacement candidates from standby pools, checks DGCA legality, and recommends cost-optimal recovery actions. |
+| **Tier 2** | **Disruption Consequence Simulator** | ✅ Production Ready | Simulates cascading disruption impacts (delays, airport curfews, crew FDP breach, illegal groundings) across Scenarios S1–S6 and generalizability benchmarks. |
+| **Tier 3** | **Recovery Optimizer & Crew Swapper** | ✅ Production Ready | Evaluates replacement candidates from standby pools and day-offs, checks DGCA legality, computes exact INR costs, and recommends optimal recovery actions. |
 
 ---
 
 ## ⚖️ DGCA CAR Section 7 Series J Legality Engine
 
-All crew operations adhere to Indian DGCA regulations implemented in `src/rules/`:
+All crew operations adhere to Indian DGCA regulations implemented in [`src/rules/`](file:///c:/Users/aayus/OneDrive/Desktop/bessemer_dcortex/src/rules/):
 
 1. **Flight Duty Period (FDP) Caps**:
-   - **2-Pilot Crew**: Table A limits based on departure time and number of sectors (up to 13.0h for 1 sector, decreasing with additional sectors).
+   - **2-Pilot Crew**: Table A limits based on departure time and number of sectors (up to 13.0h for 1–2 sectors, decreasing with additional sectors).
    - **Night Duty**: Maximum FDP of 10.0 hours for duties encroaching into the Window of Circadian Low (WOCL: 00:00–06:00). Max 2 landings during WOCL.
    - **3-Pilot (Augmented) Crew**: Table B limits extending maximum FDP up to 16.0 hours with approved onboard class rest facilities.
 2. **Cumulative Duty & Flight Time Limits**:
@@ -91,50 +103,89 @@ All crew operations adhere to Indian DGCA regulations implemented in `src/rules/
 ## 📁 Repository Structure
 
 ```
-├── data/                       # Airline operations datasets (JSON)
-│   ├── flights.json            # 147 scheduled flight segments
-│   ├── crew.json               # 150 pilot & cabin crew profiles
-│   ├── rosters.json            # 42 aircraft pairings & rosters
-│   ├── duty_clocks.json        # 7-day, 28-day, 365-day cumulative counters
-│   ├── reserve_pool.json       # Standby crew available across bases
-│   ├── certifications.json     # Line check, medical, CAT III records
-│   ├── risk_signals.json       # Fatigue & operational risk indicators
-│   ├── rules.json              # DGCA CAR rule thresholds
-│   └── costs.json              # Delay, overtime, and disruption rates
-├── frontend/                   # React 18 + Tailwind CSS + Vite Console
+├── data/                               # Airline operations datasets (JSON)
+│   ├── flights.json                    # 147 scheduled flight segments
+│   ├── crew.json                       # 150 pilot & cabin crew profiles
+│   ├── rosters.json                    # 42 aircraft pairings & rosters
+│   ├── duty_clocks.json                # Snapshot & 28-day historical counters (4,200 rows)
+│   ├── reserve_pool.json               # Standby crew available across bases
+│   ├── certifications.json             # Line check, medical, CAT III records
+│   ├── risk_signals.json               # Fatigue & operational risk indicators
+│   ├── rules.json                      # DGCA CAR regulatory thresholds
+│   ├── costs.json                      # Disruption, callout, delay, and cancellation rates
+│   ├── scenarios.json                  # Operational disruption benchmarks (S1–S6, H1)
+│   └── questions.json                  # 38 ground-truth operational questions (Q01–Q38)
+├── docs/                               # Comprehensive Technical Architecture Guides
+│   ├── README.md                       # Documentation Hub & System Map
+│   ├── DATABASE_PIPELINE.md            # SQLite schema, normalization, WAL mode
+│   ├── RULES_ENGINE.md                 # Deterministic CAR legality rules engine
+│   ├── TIER1_QUERY_ENGINE.md           # Operational query engine & Q01–Q16 benchmarks
+│   ├── TIER2_DISRUPTION_SIMULATOR.md   # Disruption consequence simulator & S1–S6 scenarios
+│   ├── TIER3_RECOVERY_OPTIMIZER.md     # Recovery candidate ranker & INR cost optimization
+│   ├── PAIRINGS_WORKSPACE_AND_ENTITIES.md # Tactical pairings workspace & Entity 360
+│   ├── LANGGRAPH_AGENT.md              # ReAct agent loop, 13 tools, context compaction
+│   ├── FULLSTACK_APP.md                # FastAPI REST endpoints & React 19 console
+│   └── BENCHMARK_AND_EVALUATION.md     # Test suite catalog & benchmark question matrix
+├── frontend/                           # React 19 + Vite + Tailwind CSS Operations Desk
 │   ├── src/
-│   │   ├── components/         # ChatConsole, MetricCard, AuditDrawer, Placeholders
-│   │   ├── App.jsx             # NOC Dashboard layout & Tier navigation
-│   │   └── main.jsx            # React root
-│   ├── vite.config.js          # Vite config with backend proxy
+│   │   ├── components/                 # Tactical pairing tables, chat, drawer, layout
+│   │   ├── pages/                      # PairingsWorkspace, Details, Crew, Copilot
+│   │   ├── hooks/                      # Data fetching hooks (usePairings, etc.)
+│   │   ├── App.jsx                     # Route definitions
+│   │   └── main.jsx                    # React entrypoint
+│   ├── vite.config.js                  # Vite config with backend proxy
 │   └── package.json
 ├── src/
-│   ├── agent/                  # LangGraph Multi-Turn ReAct Agent
-│   │   ├── client.py           # Sarvam-105B LLM client initialization
-│   │   ├── graph.py            # StateGraph cyclic workflow (agent <-> tools)
-│   │   ├── prompts.py          # Strict operational system prompts
-│   │   ├── state.py            # AgentState definitions
-│   │   └── tools.py            # LangChain tool bindings
-│   ├── api/                    # FastAPI Backend Server
-│   │   └── server.py           # REST endpoints (/api/chat, /api/stats, /api/health)
-│   ├── db/                     # Data Layer & SQLite Loader
-│   │   ├── schema.sql          # 9-table normalized relational schema
-│   │   └── loader.py           # Idempotent JSON -> SQLite database loader
-│   ├── rules/                  # Programmatic CAR Legality Engine
-│   │   ├── legality.py         # 10-point legality validation pipeline
-│   │   ├── models.py           # Pydantic models for crew, flights, pairings
-│   │   └── tables.py           # CAR Section 7 Series J Table A & B lookups
-│   └── tier1/                  # Deterministic Operational Query Handlers
-│       ├── connection.py       # Thread-safe SQLite connection factory
-│       ├── queries.py          # Zero-hallucination query handlers (Q1–Q16)
-│       └── tools.py            # Functional entrypoints for router
-├── tests/                      # Pytest Automated Test Suite (37 Tests)
-│   ├── test_api.py             # FastAPI endpoint integration tests
-│   ├── test_router.py          # LangGraph routing & tool execution tests
-│   ├── test_rules.py           # CAR legality rules unit tests
-│   └── test_tier1.py           # Deterministic queries verification (Q1–Q16)
-├── requirements.txt            # Python dependencies
-└── README.md                   # System documentation
+│   ├── agent/                          # LangGraph Multi-Turn ReAct Agent
+│   │   ├── client.py                   # Sarvam-105B LLM client initialization
+│   │   ├── graph.py                    # StateGraph cyclic workflow (agent <-> tools)
+│   │   ├── prompts.py                  # Operational system prompts
+│   │   ├── state.py                    # AgentState definitions
+│   │   └── tools.py                    # 13 LangChain tool wrappers across all tiers
+│   ├── api/                            # FastAPI Backend Server
+│   │   └── server.py                   # REST endpoints (/api/pairings, /api/chat, /api/simulate, etc.)
+│   ├── db/                             # Data Layer & SQLite Loader
+│   │   ├── schema.sql                  # 11-table normalized relational schema
+│   │   ├── loader.py                   # Idempotent JSON -> SQLite database loader
+│   │   ├── chat_store.py               # Thread-safe session & audit message store
+│   │   └── verify_db.py                # Database integrity verification script
+│   ├── rules/                          # Programmatic CAR Legality Engine
+│   │   ├── config.py                   # Dynamic loader for data/rules.json
+│   │   ├── engine.py                   # Multi-rule orchestrator (never short-circuits)
+│   │   ├── models.py                   # Pydantic models for legality reports
+│   │   ├── operational.py              # Double-booking, downstream rest, reserve windows
+│   │   ├── time_utils.py               # High-precision UTC rolling window calculations
+│   │   └── validators/                 # Domain validators (FDP, duty, rest, qual, base)
+│   ├── tier1/                          # Deterministic Operational Query Handlers
+│   │   ├── connection.py               # Thread-safe SQLite connection factory
+│   │   ├── flight_queries.py           # Schedules, departures, arrivals, statistics
+│   │   ├── crew_queries.py             # Profiles, reserve pool lookups
+│   │   ├── roster_queries.py           # Forward & reverse roster assignments
+│   │   ├── duty_queries.py             # Dynamic rolling 7d duty & 28d flight balances
+│   │   ├── cert_queries.py             # Expiring licenses & medicals sliding window
+│   │   ├── risk_queries.py             # Fatigue scores and driver tags
+│   │   ├── pairings_workspace.py       # Tactical pairing roster, risk scoring, KPIs
+│   │   └── entity_detail.py            # Flight 360 and Crew 360 profile handlers
+│   ├── tier2/                          # Disruption Consequence Simulator
+│   │   ├── models.py                   # Pydantic schemas for disruption impacts
+│   │   └── simulator.py                # Sick crew, station closures, delays, cert expiries
+│   └── tier3/                          # Recovery Optimizer & Candidate Ranker
+│       ├── costs.py                    # Dynamic INR financial rate evaluations
+│       ├── models.py                   # Schemas for recovery options and joint plans
+│       └── optimizer.py                # Candidate ranking, legality check, joint solver, callout
+├── tests/                              # Pytest Automated Test Suite (92 Core Tests Passing)
+│   ├── test_api.py                     # FastAPI REST endpoint integration tests (10 tests)
+│   ├── test_entity_detail.py           # Flight and Crew 360 detail tests (11 tests)
+│   ├── test_pairings_workspace.py      # Tactical pairings workspace & KPI tests (20 tests)
+│   ├── test_router.py                  # LangGraph routing & 13-tool execution tests (6 tests)
+│   ├── test_rules.py                   # CAR legality rules unit tests (10 tests)
+│   ├── test_tier1.py                   # Deterministic queries verification Q01–Q16 (16 tests)
+│   ├── test_tier2.py                   # Disruption simulation S1–S6 & H1 tests (11 tests)
+│   └── test_tier3.py                   # Recovery optimizer & callout drafting tests (8 tests)
+├── evaluate_tier1.py                   # Standalone CLI Tier 1 benchmark runner
+├── validate.py                         # Independent dataset integrity validator
+├── requirements.txt                    # Python dependencies
+└── README.md                           # System documentation
 ```
 
 ---
@@ -144,7 +195,7 @@ All crew operations adhere to Indian DGCA regulations implemented in `src/rules/
 ### Prerequisites
 - **Python 3.10+**
 - **Node.js 18+** and **npm**
-- **Sarvam AI API Key** (for Sarvam-105B model reasoning)
+- **Sarvam AI API Key** (for Sarvam-105B conversational reasoning)
 
 ### 1. Clone & Configure Environment
 
@@ -168,69 +219,32 @@ pip install -r requirements.txt
 Start both the FastAPI backend (`:8000`) and the React console (`:5173`) with a single command:
 
 ```bash
+# On Windows PowerShell:
+.\start.ps1
+
 # On Linux, macOS, WSL, or Git Bash:
 ./start.sh
-
-# Or on Windows PowerShell:
-.\start.ps1
 ```
-
----
-
-### Manual Step-by-Step Setup
-
-Populate the local `crew_ops.db` file from the dataset JSON files:
-```bash
-python -m src.db.loader
-```
-
-### 3. Start FastAPI Backend
-
-```bash
-uvicorn src.api.server:app --host 127.0.0.1 --port 8000 --reload
-```
-The API is live at `http://127.0.0.1:8000`. Test health:
-```bash
-curl http://127.0.0.1:8000/api/health
-```
-
-### 4. Start React Operations Console
-
-In a new terminal window:
-```bash
-cd frontend
-npm install
-npm run dev
-```
-Open your browser at **`http://127.0.0.1:5173`** to access the NOC AI Copilot console.
 
 ---
 
 ## 🧪 Automated Testing
 
-Run the full test suite across rules, query handlers, LangGraph routing, and API endpoints:
+Run the full core test suite across rules, query handlers, disruption simulators, recovery optimizers, router, and API endpoints:
 
 ```bash
-pytest tests/ -v
+pytest tests/test_api.py tests/test_entity_detail.py tests/test_pairings_workspace.py tests/test_router.py tests/test_rules.py tests/test_tier1.py tests/test_tier2.py tests/test_tier3.py -v
 ```
 
-### Test Suite Summary (37 / 37 Passing)
-- **`test_rules.py`**: Validates FDP Table A & B bounds, night duty caps, 7-day/28-day cumulative duty limits, base vs. outstation rest rules, weekly rest, and base geometry.
-- **`test_tier1.py`**: Validates deterministic query handlers against the benchmark test cases (Q1–Q16).
-- **`test_router.py`**: Verifies tool registry mapping, StateGraph compilation, and multi-turn ReAct decision logic.
-- **`test_api.py`**: Verifies REST endpoints `/api/health`, `/api/stats`, `/api/chat`, and error handling.
-
----
-
-## 💬 Sample Inquiries to Try in the Console
-
-- **Reserves Lookup**: *"Who is on reserve at BLR on 2026-09-15?"*
-- **Duty Balance**: *"What is C-1042's 7-day duty balance and 28-day flight hours?"*
-- **Flight Schedule**: *"Show all flights departing from DEL on 2026-09-15."*
-- **Certifications**: *"Which crew members have certifications expiring within 15 days?"*
-- **Aircraft Details**: *"Give me the details of flight DX412 including aircraft and route."*
-- **Pairing Roster**: *"Who is the Senior Cabin Crew on VT-DXB's pairing on 2026-09-16?"*
-- **Risk Signals**: *"Does crew member C-1042 have any active fatigue or risk signals?"*
+### Test Suite Summary (92 / 92 Core Tests Passing)
+- **`test_api.py`** (10 tests): Verifies REST endpoints `/api/health`, `/api/stats`, `/api/chat`, session lifecycle, active `/api/simulate`, and active `/api/recover`.
+- **`test_entity_detail.py`** (11 tests): Verifies Flight 360, Crew 360, 150-crew directory, and 404 handling.
+- **`test_pairings_workspace.py`** (20 tests): Verifies workspace KPIs, 2-day rotation grouping, risk models, and risk band filters.
+- **`test_router.py`** (6 tests): Verifies 13-tool registry mapping, StateGraph compilation, and multi-tier tool execution in `tools_node`.
+- **`test_rules.py`** (10 tests): Validates FDP Table A & B bounds, night duty caps, 7d/28d cumulative duty limits, base vs outstation rest, weekly rest, and base geometry.
+- **`test_tier1.py`** (16 tests): Validates deterministic query handlers against benchmark questions Q01–Q16.
+- **`test_tier2.py`** (11 tests): Validates disruption consequence simulator against Scenarios S1–S6, airport closures, and delay spectra.
+- **`test_tier3.py`** (8 tests): Validates recovery optimizer, candidate ranking, INR costing, joint multi-sick optimization, and Q36 callout alert drafting.
 
 ---
 
