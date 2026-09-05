@@ -26,6 +26,7 @@ from src.tier1 import (
     get_crew_profile,
     get_pairing_roster,
     get_crew_risk_signal,
+    query_operations,
 )
 
 # Load benchmark questions
@@ -166,6 +167,22 @@ def test_q16_c1042_risk_signal(conn):
     actual = get_crew_risk_signal(crew_id="C-1042", conn=conn)
     assert actual["score"] == expected["score"]
     assert actual["drivers"] == expected["drivers"]
+
+
+def test_generalized_crew_duty_filter(conn):
+    """Roster-wide duty queries calculate and filter every active crew member deterministically."""
+    result = query_operations(
+        resource="crew_duty",
+        filters={"status": "active"},
+        fields=["name", "rank", "duty_hours_7d", "headroom_hours"],
+        aggregation={"metric": "duty_hours_7d", "operator": "<", "value": 60},
+        sort=["duty_hours_7d", "name"],
+        limit=500,
+        conn=conn,
+    )
+    assert result["count"] == 142
+    assert all(row["duty_hours_7d"] < 60 for row in result["rows"])
+    assert all(row["name"] and row["rank"] for row in result["rows"])
 
 
 if __name__ == "__main__":

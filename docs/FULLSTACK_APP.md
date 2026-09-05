@@ -16,7 +16,6 @@ flowchart TD
         UI_Sessions["SessionSidebar.jsx\n(Multi-Turn Session History & Search)"]
         UI_Chat["ChatConsole.jsx\n(Markdown, Data Tables, & Quick Chips)"]
         UI_Audit["AuditDrawer.jsx\n(Expandable Explainability Drawer)"]
-        UI_Placeholders["TierPlaceholders.jsx\n(Tier 2 & 3 Interactive Previews)"]
     end
 
     subgraph API ["FastAPI Backend (Port 8000)"]
@@ -24,8 +23,6 @@ flowchart TD
         H_Stats["GET /api/stats"]
         H_Chat["POST /api/chat"]
         H_Sessions["GET/POST/DELETE /api/sessions"]
-        H_Sim["POST /api/simulate (Tier 2 Placeholder)"]
-        H_Rec["POST /api/recover (Tier 3 Placeholder)"]
     end
 
     subgraph Core ["Engine & Database Layer"]
@@ -94,8 +91,7 @@ The backend exposes a high-performance REST API built with FastAPI and Pydantic:
 | `POST` | `/api/sessions` | Creates a new chat session with an optional custom `title`. | `CreateSessionRequest`<br>`{"title": "..."}` | `SessionItem` |
 | `GET` | `/api/sessions/{id}` | Fetches full session metadata and uncompacted conversation history. | None | `{"session_id": "...", "messages": [...]}` |
 | `DELETE` | `/api/sessions/{id}` | Cascades deletion of a session and all its messages. | None | `{"status": "deleted", "session_id": "..."}` |
-| `POST` | `/api/simulate` | Tier 2 Disruption Simulator endpoint returning scenario impacts. | Optional payload | Scenario list & impact definitions |
-| `POST` | `/api/recover` | Tier 3 Recovery Optimizer endpoint returning candidate capabilities. | Optional payload | Optimization parameters & candidate filters |
+| `POST` | `/api/chat` | Unified Tier 1, Tier 2, and Tier 3 LangGraph entry point. | Query, session, optional tier | Grounded answer and audit trace |
 
 ### CORS & Concurrency
 - Configured with `CORSMiddleware` allowing `allow_origins=["*"]` for smooth local development.
@@ -117,8 +113,7 @@ App.jsx (Root Layout & State Coordinator)
       ├── ChatConsole.jsx (Active Tier 1 Workflow)
       │    ├── SessionSidebar.jsx (Multi-Turn Session History)
       │    └── AuditDrawer.jsx (Tool Explainability Drawer)
-      ├── Tier2Placeholder (Tier 2 Disruption Simulator Preview)
-      └── Tier3Placeholder (Tier 3 Recovery Optimizer Preview)
+      └── Tier2/Tier3 actions routed through ChatConsole -> /api/chat
 ```
 
 #### A. Navbar ([Navbar.jsx](file:///c:/Users/aayus/OneDrive/Desktop/bessemer_dcortex/frontend/src/components/Navbar.jsx))
@@ -185,8 +180,8 @@ Output:
 ```
 tests/test_api.py::test_health_endpoint PASSED
 tests/test_api.py::test_stats_endpoint PASSED
-tests/test_api.py::test_simulate_placeholder PASSED
-tests/test_api.py::test_recover_placeholder PASSED
+tests/test_api.py::test_tier2_route_is_unified_under_chat PASSED
+tests/test_api.py::test_tier3_route_is_unified_under_chat PASSED
 tests/test_api.py::test_chat_empty_query PASSED
 tests/test_api.py::test_chat_endpoint_mock PASSED
 tests/test_api.py::test_chat_endpoint_with_session_id PASSED

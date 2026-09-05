@@ -20,6 +20,7 @@ from src.tier1 import (
     get_crew_duty_balance,
     get_expiring_certifications,
     get_crew_risk_signal,
+    query_operations as _query_operations,
 )
 from src.resolver import (
     check_cover as _check_cover,
@@ -217,6 +218,38 @@ def query_crew_duty_balance(
 
 
 @tool
+def query_operations(
+    resource: str,
+    filters: dict[str, Any] | None = None,
+    fields: list[str] | None = None,
+    aggregation: dict[str, Any] | None = None,
+    sort: list[str] | None = None,
+    limit: int = 100,
+    as_of_date: str = "2026-09-14",
+    window_days: int = 7,
+) -> dict[str, Any]:
+    """Run a generalized allowlisted operational query.
+
+    Resources: flights, crew, pairings, crew_duty, reserves, certifications,
+    risk_signals. Filters support equality/list membership. Use aggregation
+    with metric/operator/value for crew_duty thresholds, or function/field for
+    count, distinct, sum, min, max, and average operations.
+    Results are deterministic and sourced from SQLite plus the existing duty
+    window calculator.
+    """
+    return _query_operations(
+        resource=resource,
+        filters=filters,
+        fields=fields,
+        aggregation=aggregation,
+        sort=sort,
+        limit=limit,
+        as_of_date=as_of_date,
+        window_days=window_days,
+    )
+
+
+@tool
 def query_expiring_certifications(
     as_of_date: str = "2026-09-15",
     days_ahead: int = 30,
@@ -398,6 +431,7 @@ TIER1_TOOLS = [
     query_crew_duty_balance,
     query_expiring_certifications,
     query_crew_risk_signal,
+    query_operations,
 ]
 
 TIER2_TOOLS = [

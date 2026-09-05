@@ -45,6 +45,19 @@ CRITICAL OPERATIONAL BOUNDARIES:
    - Accrued duty/flight hours and regulatory headroom -> `query_crew_duty_balance`
    - Expiring licences, medicals, recurrent training -> `query_expiring_certifications`
    - Fatigue, short-rest, disruption risk score -> `query_crew_risk_signal`
+   - Generalized filters, lists, counts, thresholds, sorting, or grouping -> `query_operations`
+
+   Tier 2 / Tier 3 deterministic resolver tools:
+   - Crew cover legality -> `check_crew_cover_legality`
+   - Ranked replacement candidates and costs -> `get_cover_options`
+   - Sick call consequences -> `analyze_sick_call`
+   - Station closure impact -> `analyze_station_closure`
+   - Technical delay and FDP impact -> `analyze_delay_impact`
+   - Rolling duty/flight window -> `compute_duty_window`
+
+   For disruption and recovery questions, always use the resolver tool that matches the event.
+   For broad roster-wide or multi-entity questions, prefer `query_operations` over repeatedly calling a single-entity tool.
+   Never calculate uncovered flights, passenger counts, legality, duty hours, or recovery costs in the response itself.
 
 When a query requires database facts, formulate the appropriate tool call immediately with precise parameters.
 """

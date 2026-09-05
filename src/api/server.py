@@ -3,13 +3,18 @@ src/api/server.py
 =================
 FastAPI backend server for the dCortex Crew Operations Advisor.
 Exposes REST endpoints for conversational AI chat, live database statistics,
-and placeholder endpoints for Tier 2 (Disruption Simulator) and Tier 3 (Recovery Optimizer).
+operational detail views, and persistent chat sessions.
 """
 
 import logging
 import os
 import traceback
+from pathlib import Path
 from typing import Any
+
+from dotenv import load_dotenv
+load_dotenv(Path(__file__).resolve().parents[2] / ".env")
+
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
@@ -263,65 +268,3 @@ def remove_session(session_id: str):
     return {"status": "deleted", "session_id": session_id}
 
 
-@app.post("/api/simulate")
-def simulate_disruption_placeholder(payload: dict[str, Any] | None = None):
-    """
-    Placeholder endpoint for Tier 2 Disruption Consequence Simulator.
-    """
-    return {
-        "status": "placeholder",
-        "tier": 2,
-        "title": "Tier 2: Disruption Consequence Simulator",
-        "message": "Tier 2 Impact Simulator is scheduled for implementation in Step 5.",
-        "scenarios": [
-            {
-                "id": "S1",
-                "title": "Unscheduled Sick Call (Capt C-1042 on DX412)",
-                "impact": "Grounds flight DX412 unless reserve replacement is dispatched.",
-            },
-            {
-                "id": "S2",
-                "title": "Rolling 2h Technical Delay",
-                "impact": "Triggers downstream FDP extension breach on pairing P-2291.",
-            },
-            {
-                "id": "S3",
-                "title": "Station Weather Closure (BOM Dense Fog)",
-                "impact": "Diversions and groundings cascading across network pairings.",
-            },
-            {
-                "id": "S4",
-                "title": "In-Flight Pressurization Snag Diversion",
-                "impact": "Strands crew at non-base station, requiring duty clock resets.",
-            },
-            {
-                "id": "S5",
-                "title": "Medical Divert on DX588",
-                "impact": "Breaches maximum allowable daily flight duty period.",
-            },
-            {
-                "id": "S6",
-                "title": "Mid-Roster Certification Expiration",
-                "impact": "First Officer C-2087 medical expires mid-rotation.",
-            },
-        ],
-    }
-
-
-@app.post("/api/recover")
-def recovery_optimizer_placeholder(payload: dict[str, Any] | None = None):
-    """
-    Placeholder endpoint for Tier 3 Recovery Candidate Ranker.
-    """
-    return {
-        "status": "placeholder",
-        "tier": 3,
-        "title": "Tier 3: Recovery Candidate Ranker & Cost Optimizer",
-        "message": "Tier 3 Recovery Optimizer is scheduled for implementation in Step 6.",
-        "capabilities": [
-            "Candidate Pool Generation from Active Reserves, Home Base Standbys, and Off-Duty Crew",
-            "Deterministic DGCA CAR Legality Pre-Filter (FDP, Rest, 7d/28d Headroom, Type Ratings)",
-            "Exact Multi-Variable Cost Optimization in INR (Callout Fee + Deadhead + Delay Penalty)",
-            "Automated Multi-Channel Notification Drafter (WhatsApp / SMS / Crew App Alert)",
-        ],
-    }

@@ -20,6 +20,7 @@ from langgraph.graph import END, START, StateGraph
 
 from src.db.chat_store import get_session_messages, save_message
 from .client import get_llm
+from .deterministic_router import route_deterministic_query
 from .prompts import ROUTER_SYSTEM_PROMPT
 from .state import AgentState
 from .tools import ALL_TOOLS, TOOL_MAP
@@ -229,6 +230,22 @@ def should_continue(state: AgentState) -> Literal["tools", "__end__"]:
     return "__end__"
 
 
+def deterministic_router_node(state: AgentState) -> dict[str, Any]:
+    """Resolve supported deterministic intents before invoking the external model."""
+    routed = route_deterministic_query(state["user_query"])
+    if routed is None:
+        return {}
+
+    trace = list(state.get("reasoning_trace", []))
+    routed["reasoning_trace"] = trace + routed["reasoning_trace"]
+    return routed
+
+
+def route_initial_query(state: AgentState) -> Literal["agent", "__end__"]:
+    """Skip the external model when the deterministic router produced an answer."""
+    return "__end__" if state.get("final_response") else "agent"
+
+
 def build_crew_ops_graph():
     """
     Constructs and compiles the complete multi-turn LangGraph StateGraph workflow.
@@ -236,11 +253,20 @@ def build_crew_ops_graph():
     workflow = StateGraph(AgentState)
 
     # Register nodes
+    workflow.add_node("deterministic_router", deterministic_router_node)
     workflow.add_node("agent", agent_node)
     workflow.add_node("tools", tools_node)
 
     # Define edges
-    workflow.add_edge(START, "agent")
+    workflow.add_edge(START, "deterministic_router")
+    workflow.add_conditional_edges(
+        "deterministic_router",
+        route_initial_query,
+        {
+            "agent": "agent",
+            "__end__": END,
+        },
+    )
     workflow.add_conditional_edges(
         "agent",
         should_continue,

@@ -15,7 +15,13 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
 import pytest
 
-from src.agent.graph import build_crew_ops_graph, should_continue, tools_node
+from src.agent.graph import (
+    build_crew_ops_graph,
+    deterministic_router_node,
+    route_initial_query,
+    should_continue,
+    tools_node,
+)
 from src.agent.tools import TIER1_TOOLS, TOOL_MAP
 from src.db.loader import init_db
 
@@ -27,7 +33,7 @@ def conn():
 
 
 def test_tool_registry_completeness():
-    """Verify all 10 Tier 1 tools are registered with schemas."""
+    """Verify all Tier 1 tools are registered with schemas."""
     expected_tools = {
         "query_flight_schedule",
         "query_station_departures",
@@ -39,16 +45,32 @@ def test_tool_registry_completeness():
         "query_crew_duty_balance",
         "query_expiring_certifications",
         "query_crew_risk_signal",
+        "query_operations",
     }
     registered = {t.name for t in TIER1_TOOLS}
     assert registered == expected_tools
-    assert len(TOOL_MAP) == 10
+    assert len(TOOL_MAP) == 17
 
 
 def test_graph_compilation():
     """Verify LangGraph StateGraph compiles successfully."""
     app = build_crew_ops_graph()
     assert app is not None
+
+
+def test_deterministic_router_handles_roster_wide_weekly_duty_query():
+    state = {
+        "user_query": "give me all crew members name and rank whose weekly duty hours is less than 60 hours.",
+        "reasoning_trace": ["Received Controller Query"],
+    }
+
+    result = deterministic_router_node(state)
+
+    assert route_initial_query(result) == "__end__"
+    assert result["tool_calls"][0]["name"] == "query_operations"
+    assert result["tool_results"][0]["result"]["count"] == 150
+    assert "Found **150 crew members**" in result["final_response"]
+    assert "Rendered the operational response without an external LLM call" in result["reasoning_trace"]
 
 
 def test_should_continue_logic():

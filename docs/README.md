@@ -8,6 +8,7 @@ Welcome to the technical documentation repository for the **dCortex & Bessemer T
 
 | Document | Area | Contents & Architectural Focus |
 |:---|:---|:---|
+| **[0. Complete System Architecture](ARCHITECTURE.md)** | Entire system | End-to-end flow from JSON ingestion through SQLite, deterministic engines, LangGraph, FastAPI, React, and evaluation. |
 | **[1. Database Pipeline & Ingestion](file:///c:/Users/aayus/OneDrive/Desktop/bessemer_dcortex/docs/DATABASE_PIPELINE.md)** | `src/db/` | SQLite schema, relational normalization of raw JSON, WAL mode, indexing strategy, and thread-safe session store. |
 | **[2. DGCA CAR Rules Engine](file:///c:/Users/aayus/OneDrive/Desktop/bessemer_dcortex/docs/RULES_ENGINE.md)** | `src/rules/` | Deterministic compliance engine for DGCA CAR Section 7 Series J: FDP limits, 7d/28d rolling windows, 12h rest, ratings, certs, and operational overlap constraints. |
 | **[3. Tier 1 Query Engine & Benchmarks](file:///c:/Users/aayus/OneDrive/Desktop/bessemer_dcortex/docs/TIER1_QUERY_ENGINE.md)** | `src/tier1/` | Domain-driven query handlers for flights, crew profiles, standby reserves, rosters, duty balances, and the 16 benchmark questions (Q01–Q16). |
@@ -36,7 +37,7 @@ Welcome to the technical documentation repository for the **dCortex & Bessemer T
                                    │                              │
                    ┌───────────────▼──────────────┐               │
                    │   Deterministic Tools Node   │               │
-                   │  (10 Tier 1 Python Handlers) │               │
+                   │  (11 Tier 1 Python Handlers) │               │
                    └───────────────┬──────────────┘               │
                                    │                              │
                    ┌───────────────▼──────────────────────────────▼───────────┐

@@ -41,24 +41,16 @@ def test_stats_endpoint():
     assert "BLR" in data["active_stations"]
 
 
-def test_simulate_placeholder():
-    """Verify POST /api/simulate returns Tier 2 placeholder info."""
+def test_tier2_route_is_unified_under_chat():
+    """Tier 2 has no separate REST endpoint; it uses POST /api/chat."""
     res = client.post("/api/simulate")
-    assert res.status_code == 200
-    data = res.json()
-    assert data["status"] == "placeholder"
-    assert data["tier"] == 2
-    assert len(data["scenarios"]) == 6
+    assert res.status_code == 404
 
 
-def test_recover_placeholder():
-    """Verify POST /api/recover returns Tier 3 placeholder info."""
+def test_tier3_route_is_unified_under_chat():
+    """Tier 3 has no separate REST endpoint; it uses POST /api/chat."""
     res = client.post("/api/recover")
-    assert res.status_code == 200
-    data = res.json()
-    assert data["status"] == "placeholder"
-    assert data["tier"] == 3
-    assert len(data["capabilities"]) == 4
+    assert res.status_code == 404
 
 
 def test_chat_empty_query():
@@ -106,6 +98,21 @@ def test_chat_endpoint_with_session_id():
             session_id="session-test-42",
             tier=1,
         )
+
+
+def test_chat_weekly_duty_query_does_not_require_external_model():
+    query = "give me all crew members name and rank whose weekly duty hours is less than 60 hours."
+    with patch("src.agent.graph.get_llm", side_effect=AssertionError("LLM must not be called")):
+        res = client.post(
+            "/api/chat",
+            json={"query": query, "tier": 1, "session_id": "session-duty-offline-test"},
+        )
+
+    assert res.status_code == 200
+    data = res.json()
+    assert "Found **150 crew members**" in data["response"]
+    assert data["tool_calls"][0]["name"] == "query_operations"
+    assert data["tool_results"][0]["result"]["count"] == 150
 
 
 def test_sessions_lifecycle():

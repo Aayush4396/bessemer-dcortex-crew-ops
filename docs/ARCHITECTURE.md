@@ -2,6 +2,20 @@
 
 This document describes the current end-to-end architecture of the dCortex Crew Operations Advisor: data ingestion, SQLite storage, deterministic query and legality logic, resolver flows, LangGraph orchestration, FastAPI APIs, React UI, and evaluation.
 
+## Quick Navigation
+
+1. [System purpose and architecture](#1-system-purpose)
+2. [Source data and ingestion](#3-source-data-and-ingestion)
+3. [Relational data model](#4-relational-data-model)
+4. [Startup and request flow](#5-application-startup)
+5. [Tier 1 deterministic queries](#7-tier-1-deterministic-query-layer)
+6. [Time calculations and legality](#8-time-and-duty-calculations)
+7. [Tier 2 disruption analysis](#10-tier-2-disruption-analysis)
+8. [Tier 3 recovery and costing](#11-tier-3-recovery-and-costing)
+9. [Agent, API, UI, and evaluation](#12-agent-tool-registry)
+10. [Current boundaries and next work](#16-next-integration-work)
+11. [Rubric alignment and honest limitations](#17-rubric-alignment-and-honest-limitations)
+
 ## 1. System Purpose
 
 The application is a NOC copilot for a fictional airline operating from a BLR hub. It answers crew-control questions using a frozen synthetic operational snapshot:
@@ -13,6 +27,25 @@ The application is a NOC copilot for a fictional airline operating from a BLR hu
 - Time convention: UTC; rolling duty windows use inclusive calendar dates
 
 The core design rule is that the LLM does not calculate operational values. It identifies the required operation and formats verified results. Python and SQLite perform lookups, time arithmetic, legality checks, disruption analysis, and recovery costing.
+
+### Abstract flow
+
+```mermaid
+flowchart LR
+    Data[Operational snapshot]
+    Store[SQLite source of truth]
+    Compute[Deterministic Python engines]
+    Reason[LangGraph + LLM tool selection]
+    API[FastAPI contract]
+    UI[React operations console]
+
+    Data --> Store --> Compute
+    Reason --> Compute
+    Compute --> Reason
+    Reason --> API --> UI
+```
+
+Read the diagram from left to right for data and from the center outward for a user request: the LLM selects an operation, deterministic code executes it, and the verified result returns through the API to the console.
 
 ## 2. High-Level Architecture
 
@@ -80,7 +113,7 @@ flowchart TB
 
 ### Current implementation boundary
 
-The deterministic resolver and agent tools for Tier 2 and Tier 3 are implemented. `POST /api/simulate` and `POST /api/recover` in `src/api/server.py` still return placeholder responses, so direct UI/API access to those capabilities is not yet connected end to end.
+The deterministic resolver and agent tools for Tier 2 and Tier 3 are implemented. Tier 2 and Tier 3 are accessed through `POST /api/chat` and the LangGraph tool loop; there are no separate simulation or recovery REST routes.
 
 ## 3. Source Data and Ingestion
 
@@ -262,6 +295,7 @@ sequenceDiagram
     participant React
     participant API as FastAPI /api/chat
     participant Graph as LangGraph
+    participant Router as Deterministic intent router
     participant LLM as Sarvam-105B
     participant Tools as Deterministic tools
     participant DB as SQLite
@@ -272,15 +306,24 @@ sequenceDiagram
     API->>Graph: run_crew_ops_agent(query, session_id, tier)
     Graph->>Store: Load prior session messages
     Graph->>Graph: Build frozen-clock and active-entity context
-    Graph->>LLM: Send prompt and tool schemas
-    LLM-->>Graph: Tool call or final response
-    alt Tool call returned
-        Graph->>Tools: Execute selected Python tool
+    Graph->>Router: Match supported deterministic intent
+    alt Deterministic intent matched
+        Router->>Tools: Execute allowlisted query plan
         Tools->>DB: Run deterministic query/calculation
         DB-->>Tools: Verified records
-        Tools-->>Graph: Tool result + audit trace
-        Graph->>LLM: Send tool result
-        LLM-->>Graph: Final operational response
+        Tools-->>Router: Tool result + audit trace
+        Router-->>Graph: Grounded response without provider call
+    else General conversational intent
+        Graph->>LLM: Send prompt and tool schemas
+        LLM-->>Graph: Tool call or final response
+        opt Tool call returned
+            Graph->>Tools: Execute selected Python tool
+            Tools->>DB: Run deterministic query/calculation
+            DB-->>Tools: Verified records
+            Tools-->>Graph: Tool result + audit trace
+            Graph->>LLM: Send tool result
+            LLM-->>Graph: Final operational response
+        end
     end
     Graph->>Store: Persist user message, response, tools, trace
     Graph-->>API: Response and audit payloads
@@ -288,10 +331,11 @@ sequenceDiagram
     React-->>Controller: Answer and expandable audit trail
 ```
 
-The graph has two nodes:
+The graph has three nodes:
 
-1. `agent`: invokes the LLM with all registered tool schemas.
-2. `tools`: executes requested tools and appends `ToolMessage` results.
+1. `deterministic_router`: recognizes supported direct operational intents and executes an allowlisted query plan without external model dependency.
+2. `agent`: invokes the LLM with all registered tool schemas for queries not handled by the deterministic router.
+3. `tools`: executes LLM-requested tools and appends `ToolMessage` results.
 
 The conditional edge loops back to `agent` when tool calls exist and ends after a final response. A six-tool-call safety limit prevents runaway loops. Historical tool payloads are compacted before later turns, while active aviation entities such as crew, flight, aircraft, and pairing IDs are retained for pronoun resolution.
 
@@ -581,8 +625,9 @@ flowchart LR
 
 Current tool groups:
 
-- Tier 1: 10 schedule, crew, reserve, roster, duty, certification, and risk tools.
+- Tier 1: 11 schedule, crew, reserve, roster, duty, certification, risk, and generalized query tools.
 - Tier 2/3 group: `check_crew_cover_legality`, `get_cover_options`, `analyze_sick_call`, `analyze_station_closure`, `analyze_delay_impact`, and `compute_duty_window`.
+- Generalized queries: `query_operations` supports allowlisted resources, filters, fields, sorting, limits, thresholds, counts, distinct values, and numeric aggregations.
 
 The agent currently binds `ALL_TOOLS`. The `tier` request value is returned and persisted, but tool availability is not yet isolated into separate Tier 1, Tier 2, and Tier 3 registries.
 
@@ -601,8 +646,6 @@ The agent currently binds `ALL_TOOLS`. The `tier` request value is returned and 
 | `GET /api/crew/{crew_id}` | Crew detail |
 | `POST /api/chat` | LangGraph chat request with audit payload |
 | `GET/POST/DELETE /api/sessions...` | Persistent chat sessions and history |
-| `POST /api/simulate` | Placeholder response; not wired to resolver |
-| `POST /api/recover` | Placeholder response; not wired to resolver |
 
 ```mermaid
 flowchart TD
@@ -669,11 +712,141 @@ The following invariants should be preserved when extending the system:
 
 ## 16. Next Integration Work
 
-The remaining work to make the architecture fully end to end is concentrated at the API boundary:
+The remaining work to make the architecture fully end to end is concentrated at the chat and frontend boundary:
 
-1. Add typed request/response models for disruption and recovery operations.
-2. Route `/api/simulate` to `expand_sick_call`, `expand_station_closure`, and `expand_delay`.
-3. Route `/api/recover` to `cover_options` and add a dedicated joint optimizer for simultaneous absences.
-4. Add explicit Tier 2/Tier 3 prompt guidance and tier-specific tool binding.
-5. Connect the frontend recovery/simulation screens to the new endpoints.
-6. Add API integration tests for the resolver outputs and scenario payloads.
+1. Add explicit tier selection to the frontend copilot.
+2. Add a dedicated joint optimizer for simultaneous absences.
+3. Connect frontend recovery/simulation screens to `/api/chat` with structured prompts or dedicated chat actions.
+4. Add API integration tests for resolver tool dispatch and scenario payloads.
+
+## 17. Rubric Alignment and Honest Limitations
+
+This section maps the implementation to the expected prototype deliverables and makes the LLM/deterministic boundary explicit.
+
+### 17.1 Reasoning boundary
+
+```mermaid
+flowchart LR
+    User[Natural-language controller question]
+    subgraph LLM[LLM reasoning boundary]
+        Intent[Interpret intent and entities]
+        Select[Select registered tool]
+        Args[Produce structured arguments]
+        Explain[Compose grounded explanation]
+    end
+    subgraph DET[Deterministic execution boundary]
+        Validate[Validate allowlisted arguments]
+        SQL[Parameterized SQLite query]
+        Math[Python time, legality, disruption, recovery, cost logic]
+        Evidence[Return facts, exclusions, derivation, trace]
+    end
+    User --> Intent --> Select --> Args --> Validate
+    Validate --> SQL --> Math --> Evidence --> Explain --> User
+    Explain -. never calculates .-> Math
+```
+
+The deterministic router handles recognized direct query plans before the LLM boundary. For remaining questions, the model is an orchestrator and narrator, not the source of truth. Tool schemas constrain the request; the service layer constrains resources, fields, operators, and limits; SQLite and Python produce the operational result.
+
+### 17.2 Natural-language request path
+
+```mermaid
+sequenceDiagram
+    actor Controller
+    participant UI as React NOC console
+    participant API as FastAPI /api/chat
+    participant Graph as LangGraph StateGraph
+    participant Tool as Deterministic tool
+    participant DB as crew_ops.db
+    Controller->>UI: Ask question in chat
+    UI->>API: session_id, message
+    API->>Graph: Invoke state graph
+    Graph->>Tool: Tool name + validated arguments
+    Tool->>DB: Read-only parameterized query
+    DB-->>Tool: Rows / operational facts
+    Tool-->>Graph: Result + evidence metadata
+    Graph-->>API: Answer + reasoning trace
+    API-->>UI: Message, tool calls, raw results
+    UI-->>Controller: Answer and audit drawer
+```
+
+### 17.3 Explainability path
+
+```mermaid
+flowchart TD
+    Q[Question] --> D[Tool dispatch record]
+    D --> A[Exact tool arguments]
+    A --> R[Raw deterministic result]
+    R --> Derive[Visible derivation: dates, rules, totals, exclusions]
+    Derive --> Answer[Plain-language answer]
+    D --> Audit[Frontend audit drawer]
+    A --> Audit
+    R --> Audit
+    Derive --> Audit
+    Answer --> Audit
+```
+
+Every non-trivial answer should expose enough of this chain for a controller to distinguish database facts from computed conclusions. A missing credential or unavailable model is an operational failure, not a reason to invent an answer.
+
+### 17.4 Grounding and data boundary
+
+```mermaid
+flowchart LR
+    JSON[data/*.json synthetic snapshot]
+    Rules[data/rules.json]
+    Costs[data/costs.json]
+    Fixtures[data/questions.json and scenarios.json]
+    Loader[db/loader.py]
+    DB[(crew_ops.db)]
+    Runtime[Deterministic runtime]
+    Trace[Evidence and audit payload]
+    JSON --> Loader --> DB
+    Rules --> Runtime
+    Costs --> Runtime
+    DB --> Runtime
+    Fixtures --> Evaluators[Evaluation scripts]
+    Runtime --> Trace
+```
+
+The runtime reads operational entities from SQLite. JSON files are ingestion/configuration/evaluation inputs; they are not an alternate live query source. The published snapshot remains synthetic and local.
+
+### 17.5 Coverage by tier
+
+```mermaid
+flowchart LR
+    T1[Tier 1: lookup, filters, thresholds] --> Q[query_operations or domain tools]
+    T2[Tier 2: absence / disruption] --> S[analyze_sick_call, analyze_disruption]
+    T3[Tier 3: replacement / recovery] --> C[find_replacements, evaluate_recovery, cost tools]
+    Q --> DB[(SQLite)]
+    S --> Rules[Deterministic legality rules]
+    C --> Rules
+    Rules --> Explain[Grounded answer + trace]
+    DB --> Explain
+```
+
+Examples: “all crew below 60 duty hours” uses `query_operations`; a sick-call question enumerates affected pairing legs; a recovery question ranks legal candidates and reports excluded candidates and costs. All three remain reachable through the same `/api/chat` LangGraph path.
+
+### 17.6 Honest failure case
+
+```mermaid
+flowchart TD
+    Unsupported["Who will call in sick next month?"] --> Available[Only historical/precomputed risk signals exist]
+    Available --> Refuse[State that prediction is unsupported]
+    Refuse --> Grounded[Offer available risk records without claiming a forecast]
+```
+
+The system must not turn a risk signal into a prediction. Other current limitations are voice input, a dedicated joint optimizer for simultaneous absences, and model-dependent tool selection when the Sarvam endpoint is unavailable. Unsupported filters or calculations should produce an explicit limitation rather than a guessed result.
+
+### 17.7 Live demo and presentation flow
+
+```mermaid
+flowchart LR
+    Start[Start backend + frontend] --> Health[Verify /health]
+    Health --> Lookup[Ask a Tier 1 roster/flight question]
+    Lookup --> Audit[Open visible tool/evidence trace]
+    Audit --> Disruption[Ask Tier 2 sick-call question]
+    Disruption --> Recovery[Ask Tier 3 replacement/cost question]
+    Recovery --> Failure[Show unsupported prediction example]
+    Failure --> Close[Explain trade-offs and limitations]
+```
+
+The README, this architecture document, evaluator scripts, and the frontend together provide the setup, conversational interface, deterministic reasoning layer, explanation surface, sample flows, and honest failure analysis required for the prototype demonstration.
