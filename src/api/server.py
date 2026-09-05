@@ -13,6 +13,13 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
 from src.agent import run_crew_ops_agent
+from src.db.chat_store import (
+    create_session,
+    delete_session,
+    get_session,
+    get_session_messages,
+    list_sessions,
+)
 from src.rules.models import SNAPSHOT_DATE
 from src.tier1.connection import get_connection
 from src.tier1.entity_detail import get_crew_detail, get_flight_detail, list_crew
@@ -41,6 +48,7 @@ app.add_middleware(
 class ChatRequest(BaseModel):
     query: str = Field(..., description="Operational question from the Crew Controller")
     tier: int = Field(default=1, description="Context tier (1: Lookup, 2: Disruption, 3: Recovery)")
+    session_id: str = Field(default="default", description="Session identifier for multi-turn conversational context")
 
 
 class ChatResponse(BaseModel):
@@ -49,6 +57,20 @@ class ChatResponse(BaseModel):
     tool_results: list[dict[str, Any]]
     reasoning_trace: list[str]
     tier: int
+    session_id: str = "default"
+
+
+class CreateSessionRequest(BaseModel):
+    session_id: str | None = Field(default=None, description="Optional custom session ID; auto-generated if omitted")
+    title: str = Field(default="New Session", description="Display title for the session")
+
+
+class SessionItem(BaseModel):
+    session_id: str
+    title: str
+    created_at: str
+    updated_at: str
+    message_count: int
 
 
 class StatsResponse(BaseModel):
@@ -191,16 +213,51 @@ def chat_endpoint(req: ChatRequest):
         raise HTTPException(status_code=400, detail="Query cannot be empty")
 
     try:
-        result = run_crew_ops_agent(query=req.query, tier=req.tier)
+        result = run_crew_ops_agent(query=req.query, session_id=req.session_id, tier=req.tier)
         return ChatResponse(
             response=result.get("final_response", ""),
             tool_calls=result.get("tool_calls", []),
             tool_results=result.get("tool_results", []),
             reasoning_trace=result.get("reasoning_trace", []),
             tier=req.tier,
+            session_id=req.session_id,
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Agent execution error: {str(e)}")
+
+
+@app.get("/api/sessions", response_model=list[SessionItem])
+def get_sessions():
+    """List all chat sessions ordered by most recently updated."""
+    return list_sessions()
+
+
+@app.post("/api/sessions", response_model=SessionItem)
+def create_new_session(req: CreateSessionRequest | None = None):
+    """Create a new chat session."""
+    session_id = req.session_id if req and req.session_id else None
+    title = req.title if req and req.title else "New Session"
+    sess = create_session(session_id=session_id, title=title)
+    return sess
+
+
+@app.get("/api/sessions/{session_id}")
+def get_session_history(session_id: str):
+    """Fetch all messages and audit payloads for a given session."""
+    messages = get_session_messages(session_id)
+    session_meta = get_session(session_id)
+    return {
+        "session_id": session_id,
+        "session": session_meta,
+        "messages": messages,
+    }
+
+
+@app.delete("/api/sessions/{session_id}")
+def remove_session(session_id: str):
+    """Delete a session and all its associated messages."""
+    delete_session(session_id)
+    return {"status": "deleted", "session_id": session_id}
 
 
 @app.post("/api/simulate")
