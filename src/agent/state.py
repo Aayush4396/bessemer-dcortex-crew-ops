@@ -17,6 +17,8 @@ class AgentState(TypedDict):
     messages: Annotated[list[BaseMessage], add_messages]
     user_query: str
     tier: int
+    session_id: str
+    active_entities: dict[str, str]
     tool_calls: list[dict[str, Any]]
     tool_results: list[dict[str, Any]]
     reasoning_trace: list[str]
