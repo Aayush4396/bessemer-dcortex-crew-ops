@@ -53,11 +53,11 @@ export async function fetchPairings({ date, aircraft, risk } = {}) {
   return response.json()
 }
 
-export async function sendChatQuery(query) {
+export async function sendChatQuery(query, sessionId) {
   const response = await fetch('/api/chat', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ query, tier: 1 }),
+    body: JSON.stringify({ query, tier: 1, session_id: sessionId }),
   })
   if (!response.ok) {
     const body = await response.json().catch(() => ({}))

@@ -4,8 +4,11 @@ src/resolver/disruption.py
 Disruption expansion functions for Tier 2/3 scenarios.
 """
 
+import json
+import sqlite3
 from datetime import date, datetime, timedelta
 
+from src.tier1.connection import get_connection
 from src.resolver.data import (
     load_all,
     FBY,
@@ -33,23 +36,86 @@ def _duty_len(day: dict) -> tuple[float, datetime, datetime]:
     return _hrs(rel - rep), rep, rel
 
 
-def expand_sick_call(sick_cid: str, pairing_id: str) -> dict:
-    """Expand a sick-call event: uncovered flights, pax at risk, pairing details."""
-    load_all()
-    p = next(p for p in pairings if p["pairing_id"] == pairing_id)
-    day1_flights = p["days"][0]["flights"]
-    pax = sum(FBY[fid]["seats"] for fid in day1_flights)
+def expand_sick_call(
+    sick_cid: str,
+    pairing_id: str | None = None,
+    event_date: str | None = None,
+    conn: sqlite3.Connection | None = None,
+) -> dict:
+    """Expand a sick-call event from the SQLite roster and flight snapshot."""
+    connection = get_connection(conn)
+    try:
+        if pairing_id is None:
+            if event_date is None:
+                raise ValueError("A pairing_id or event_date is required for a sick-call analysis")
+            matching_pairings = connection.execute(
+                """
+                SELECT DISTINCT pc.pairing_id
+                FROM pairing_crew pc
+                JOIN pairings p ON p.pairing_id = pc.pairing_id
+                WHERE pc.crew_id = ? AND p.date = ?
+                ORDER BY pc.pairing_id
+                """,
+                (sick_cid, event_date),
+            ).fetchall()
+            if not matching_pairings:
+                raise ValueError(f"Crew {sick_cid} has no pairing on {event_date}")
+            if len(matching_pairings) > 1:
+                pairing_ids = [row["pairing_id"] for row in matching_pairings]
+                raise ValueError(f"Crew {sick_cid} has multiple pairings on {event_date}: {pairing_ids}")
+            pairing_id = matching_pairings[0]["pairing_id"]
 
-    result = {
-        "pairing_id": pairing_id,
-        "sick_crew_id": sick_cid,
-        "uncovered_flights_day1": day1_flights,
-        "passengers_at_risk_day1": pax,
-    }
-    if len(p["days"]) > 1:
-        result["uncovered_flights_day2"] = p["days"][1]["flights"]
+        assignment = connection.execute(
+            """
+            SELECT pc.role
+            FROM pairing_crew pc
+            WHERE pc.pairing_id = ? AND pc.crew_id = ?
+            """,
+            (pairing_id, sick_cid),
+        ).fetchone()
+        if assignment is None:
+            raise ValueError(f"Crew {sick_cid} is not assigned to pairing {pairing_id}")
 
-    return result
+        pairing_days = connection.execute(
+            """
+            SELECT date, flights_json
+            FROM pairings
+            WHERE pairing_id = ?
+            ORDER BY date, report_utc
+            """,
+            (pairing_id,),
+        ).fetchall()
+        if not pairing_days:
+            raise ValueError(f"Pairing {pairing_id} was not found")
+
+        relevant_days = [day for day in pairing_days if event_date is None or day["date"] >= event_date]
+        if not relevant_days:
+            raise ValueError(f"Pairing {pairing_id} has no duty on or after {event_date}")
+        flights_by_day = [json.loads(day["flights_json"]) for day in relevant_days]
+        day1_flights = flights_by_day[0]
+        placeholders = ",".join("?" for _ in day1_flights)
+        seat_rows = connection.execute(
+            f"SELECT flight_id, seats FROM flights WHERE flight_id IN ({placeholders})",
+            tuple(day1_flights),
+        ).fetchall()
+        seats_by_flight = {row["flight_id"]: int(row["seats"]) for row in seat_rows}
+        missing_flights = [flight_id for flight_id in day1_flights if flight_id not in seats_by_flight]
+        if missing_flights:
+            raise ValueError(f"Missing flight records for pairing {pairing_id}: {missing_flights}")
+
+        result = {
+            "pairing_id": pairing_id,
+            "sick_crew_id": sick_cid,
+            "role": assignment["role"],
+            "uncovered_flights_day1": day1_flights,
+            "passengers_at_risk_day1": sum(seats_by_flight[flight_id] for flight_id in day1_flights),
+        }
+        if len(flights_by_day) > 1:
+            result["uncovered_flights_day2"] = flights_by_day[1]
+        return result
+    finally:
+        if conn is None:
+            connection.close()
 
 
 def expand_station_closure(

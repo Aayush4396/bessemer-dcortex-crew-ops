@@ -73,6 +73,94 @@ def test_deterministic_router_handles_roster_wide_weekly_duty_query():
     assert "Rendered the operational response without an external LLM call" in result["reasoning_trace"]
 
 
+def test_deterministic_router_handles_sick_call_query_from_sqlite():
+    state = {
+        "user_query": "Captain C-1042 calls in sick at 05:00Z on 15 Sep for pairing P-2291. Which flights are immediately uncrewed?",
+        "reasoning_trace": ["Received Controller Query"],
+    }
+
+    result = deterministic_router_node(state)
+
+    assert route_initial_query(result) == "__end__"
+    assert result["tool_calls"][0]["name"] == "analyze_sick_call"
+    payload = result["tool_results"][0]["result"]
+    assert payload["uncovered_flights_day1"] == [
+        "DX412-2026-09-15",
+        "DX413-2026-09-15",
+        "DX588-2026-09-15",
+    ]
+    assert payload["uncovered_flights_day2"] == [
+        "DX589-2026-09-16",
+        "DX590-2026-09-16",
+        "DX591-2026-09-16",
+    ]
+    assert payload["passengers_at_risk_day1"] == 486
+    assert "**3 Day 1 flights are immediately uncrewed**" in result["final_response"]
+
+
+def test_deterministic_router_resolves_missing_pairing_from_crew_and_date():
+    state = {
+        "user_query": "Captain C-1042 calls in unavailable at 05:00Z on 15 Sep. Which flights are immediately uncrewed?",
+        "reasoning_trace": ["Received Controller Query"],
+    }
+
+    result = deterministic_router_node(state)
+
+    assert route_initial_query(result) == "__end__"
+    assert result["tool_calls"][0]["args"]["pairing_id"] == "P-2291"
+    assert result["tool_calls"][0]["args"]["event_date"] == "2026-09-15"
+    assert result["tool_results"][0]["result"]["uncovered_flights_day1"][0] == "DX412-2026-09-15"
+
+
+def test_deterministic_router_handles_standalone_replacement_query():
+    state = {
+        "user_query": "who can be the replacement captain for pairing P-2291?",
+        "reasoning_trace": ["Received Controller Query"],
+    }
+
+    result = deterministic_router_node(state)
+
+    assert route_initial_query(result) == "__end__"
+    assert result["tool_calls"][0]["name"] == "get_cover_options"
+    payload = result["tool_results"][0]["result"]
+    assert payload["sick_crew_id"] == "C-1042"
+    assert payload["options"][0]["crew_id"] == "C-3310"
+    assert payload["options"][0]["cost_inr"] == 18500
+
+
+def test_deterministic_router_composes_sick_call_and_replacement_intents():
+    state = {
+        "user_query": (
+            "Captain C-1042 calls in sick at 05:00Z on 15 Sep for pairing P-2291. "
+            "Which flights are immediately uncrewed? Who can cover up for C-1042?"
+        ),
+        "reasoning_trace": ["Received Controller Query"],
+    }
+
+    result = deterministic_router_node(state)
+
+    assert [call["name"] for call in result["tool_calls"]] == ["analyze_sick_call", "get_cover_options"]
+    assert "DX412" in result["final_response"]
+    assert "C-3310" in result["final_response"]
+
+
+def test_deterministic_router_uses_context_for_candidate_follow_up():
+    state = {
+        "user_query": "can C-3311 replace for C-1042?",
+        "active_entities": {"pairing_id": "P-2291", "sick_crew_id": "C-1042"},
+        "reasoning_trace": ["Received Controller Query"],
+    }
+
+    result = deterministic_router_node(state)
+
+    payload = result["tool_results"][0]["result"]
+    assert payload["candidate_id"] == "C-3311"
+    assert payload["candidate_rank"] == "First Officer"
+    assert payload["required_role"] == "Captain"
+    assert payload["legal"] is False
+    assert "role mismatch" in payload["issues"][0]
+
+
 def test_should_continue_logic():
     """Verify conditional edge correctly routes between tools and synthesizer."""
     # Message with tool call -> routes to 'tools'

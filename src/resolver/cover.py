@@ -16,6 +16,7 @@ from src.resolver.data import (
     costs,
     reserve_pool,
     RESERVE_IDS,
+    pairings,
     ODD,
     EVEN,
 )
@@ -210,3 +211,93 @@ def cover_options(
         o["rank"] = i + 1
 
     return options, excluded
+
+
+def _deadhead_consequence(candidate_base: str, pdays: list[dict]) -> dict | None:
+    """Compute deadhead positioning details for a cross-base candidate."""
+    dep_station = FBY[pdays[0]["flights"][0]]["dep_station"]
+    if candidate_base == dep_station:
+        return None
+    if candidate_base == "DEL" and dep_station == "BLR":
+        d = date.fromisoformat(pdays[0]["date"])
+        if d in EVEN:
+            dh_flight, arr_time = "DX589", "07:45Z"
+            arr = _dt(d, "07:45")
+        else:
+            dh_flight, arr_time = "DX402", "08:45Z"
+            arr = _dt(d, "08:45")
+        dep0 = _parse_dt(FBY[pdays[0]["flights"][0]]["dep_utc"])
+        delay_h = round(max(0.0, _hrs((arr + timedelta(minutes=75)) - dep0)), 2)
+        pilot = True
+        cost = costs["deadhead_positioning"] + round(delay_h * costs["delay_cost_per_duty_hour"])
+        return {
+            "requires_deadhead": True,
+            "positioning_flight": dh_flight,
+            "positioning_arrival": arr_time,
+            "transit_minutes": 75,
+            "delay_hours": delay_h,
+            "deadhead_cost_inr": cost,
+            "consequence": (
+                f"Deadhead positioning on {dh_flight} (arr {arr_time}) "
+                f"delays the first departure by ~{delay_h}h; RULE-BASE-07 deadhead cost applies."
+            ),
+        }
+    return {
+        "requires_deadhead": True,
+        "blocked": True,
+        "consequence": "RULE-BASE-07: no same-day positioning flight from base",
+    }
+
+
+def evaluate_replacement_candidate(
+    candidate_id: str,
+    pairing_id: str,
+    unavailable_crew_id: str,
+) -> dict:
+    """Evaluate one named candidate against the unavailable crew member's pairing role."""
+    load_all()
+    pairing = next((item for item in pairings if item["pairing_id"] == pairing_id), None)
+    if pairing is None:
+        raise ValueError(f"Pairing {pairing_id} was not found")
+    candidate = crew.get(candidate_id)
+    if candidate is None:
+        raise ValueError(f"Crew {candidate_id} was not found")
+    incumbent = next(
+        (member for member in pairing["crew"] if member["crew_id"] == unavailable_crew_id),
+        None,
+    )
+    if incumbent is None:
+        raise ValueError(f"Crew {unavailable_crew_id} is not assigned to pairing {pairing_id}")
+
+    required_role = incumbent["role"]
+    issues: list[str] = []
+    if candidate["status"] != "active":
+        issues.append(f"crew status is {candidate['status']}, not active")
+    if candidate["rank"] != required_role:
+        issues.append(
+            f"RULE-QUAL-05: role mismatch; {candidate_id} is {candidate['rank']} but {required_role} is required"
+        )
+
+    deadhead = _deadhead_consequence(candidate["base"], pairing["days"])
+    delay_h = deadhead["delay_hours"] if deadhead and not deadhead.get("blocked") else 0.0
+
+    if deadhead and deadhead.get("blocked"):
+        issues.append(deadhead["consequence"])
+
+    if not issues:
+        legal, issues = check_cover(candidate_id, pairing["days"], delay_h=delay_h)
+    else:
+        legal = False
+
+    result = {
+        "candidate_id": candidate_id,
+        "candidate_rank": candidate["rank"],
+        "pairing_id": pairing_id,
+        "unavailable_crew_id": unavailable_crew_id,
+        "required_role": required_role,
+        "legal": legal,
+        "issues": issues,
+    }
+    if deadhead and not deadhead.get("blocked"):
+        result["operational_consequence"] = deadhead
+    return result

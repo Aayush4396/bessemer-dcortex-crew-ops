@@ -1,0 +1,595 @@
+{
+  "suite_id": "tier1-general-query-corpus-v1",
+  "tier": 1,
+  "snapshot_date": "2026-09-14",
+  "purpose": "Natural-language examples for evaluating whether Tier 1 can plan and execute generalized, grounded SQLite analytics through query_operations.",
+  "evaluation_notes": [
+    "Each prompt variant under a case must resolve to the same expected_plan semantics.",
+    "All supported cases must use query_operations and must be grounded in crew_ops.db.",
+    "Expected assertions are snapshot-specific and were generated from the current SQLite database.",
+    "The unsupported cases are intentional controls: the system should state the limitation or ask for clarification, never invent an answer.",
+    "Passing this corpus demonstrates broad coverage of the current Tier 1 query DSL; it does not prove support for every possible natural-language query."
+  ],
+  "supported_cases": [
+    {
+      "id": "GQ001",
+      "category": "flight_filter",
+      "prompts": [
+        "List all BLR to BOM flights on 15 September 2026 in departure order.",
+        "Which flights operate from Bengaluru to Mumbai on 2026-09-15?"
+      ],
+      "expected_tool": "query_operations",
+      "expected_plan": {
+        "resource": "flights",
+        "filters": {"date": "2026-09-15", "origin": "BLR", "destination": "BOM"},
+        "fields": ["flight_id", "flight_no", "dep_utc"],
+        "sort": ["dep_utc"],
+        "limit": 500
+      },
+      "expected": {
+        "count": 2,
+        "ordered_flight_ids": ["DX431-2026-09-15", "DX412-2026-09-15"]
+      }
+    },
+    {
+      "id": "GQ002",
+      "category": "flight_count",
+      "prompts": [
+        "How many flights are scheduled on 15 Sep 2026?",
+        "Give me the total number of flight sectors on 2026-09-15."
+      ],
+      "expected_tool": "query_operations",
+      "expected_plan": {
+        "resource": "flights",
+        "filters": {"date": "2026-09-15"},
+        "fields": ["flight_id"],
+        "aggregation": {"function": "count"},
+        "limit": 500
+      },
+      "expected": {"count": 21, "aggregation_value": 21}
+    },
+    {
+      "id": "GQ003",
+      "category": "flight_count_with_filters",
+      "prompts": [
+        "How many A320 flights operate on 15 September?",
+        "Count the A320 sectors scheduled for 2026-09-15."
+      ],
+      "expected_tool": "query_operations",
+      "expected_plan": {
+        "resource": "flights",
+        "filters": {"date": "2026-09-15", "aircraft_type": "A320"},
+        "fields": ["flight_id"],
+        "aggregation": {"function": "count"},
+        "limit": 500
+      },
+      "expected": {"count": 15, "aggregation_value": 15}
+    },
+    {
+      "id": "GQ004",
+      "category": "flight_top_n",
+      "prompts": [
+        "Show the five longest flights on 15 Sep by block time.",
+        "What are the top 5 sectors by block hours on 2026-09-15?"
+      ],
+      "expected_tool": "query_operations",
+      "expected_plan": {
+        "resource": "flights",
+        "filters": {"date": "2026-09-15"},
+        "fields": ["flight_no", "block_hours"],
+        "sort": ["-block_hours", "flight_no"],
+        "limit": 5
+      },
+      "expected": {
+        "count": 5,
+        "ordered_rows": [
+          {"flight_no": "DX401", "block_hours": 2.75},
+          {"flight_no": "DX402", "block_hours": 2.75},
+          {"flight_no": "DX588", "block_hours": 2.75},
+          {"flight_no": "DX421", "block_hours": 2.5},
+          {"flight_no": "DX422", "block_hours": 2.5}
+        ]
+      }
+    },
+    {
+      "id": "GQ005",
+      "category": "flight_distinct",
+      "prompts": [
+        "Which distinct destinations can I fly to from BLR on 15 September?",
+        "List the unique arrival stations served from Bengaluru on 2026-09-15."
+      ],
+      "expected_tool": "query_operations",
+      "expected_plan": {
+        "resource": "flights",
+        "filters": {"date": "2026-09-15", "origin": "BLR"},
+        "fields": ["destination"],
+        "aggregation": {"function": "distinct", "field": "destination"},
+        "sort": ["destination"],
+        "limit": 500
+      },
+      "expected": {
+        "aggregation_count": 7,
+        "aggregation_value": ["BOM", "CCU", "COK", "DEL", "GOI", "HYD", "MAA"]
+      }
+    },
+    {
+      "id": "GQ006",
+      "category": "flight_average",
+      "prompts": [
+        "What is the average block time of flights on 15 Sep?",
+        "Calculate the mean scheduled block hours for 2026-09-15."
+      ],
+      "expected_tool": "query_operations",
+      "expected_plan": {
+        "resource": "flights",
+        "filters": {"date": "2026-09-15"},
+        "fields": ["block_hours"],
+        "aggregation": {"function": "avg", "field": "block_hours"},
+        "limit": 500
+      },
+      "expected": {"count": 21, "aggregation_value": 1.6547619047619047}
+    },
+    {
+      "id": "GQ007",
+      "category": "flight_sum",
+      "prompts": [
+        "What is the total seat capacity departing BLR on 15 September?",
+        "Sum the seats on all Bengaluru departures for 2026-09-15."
+      ],
+      "expected_tool": "query_operations",
+      "expected_plan": {
+        "resource": "flights",
+        "filters": {"date": "2026-09-15", "origin": "BLR"},
+        "fields": ["seats"],
+        "aggregation": {"function": "sum", "field": "seats"},
+        "limit": 500
+      },
+      "expected": {"count": 11, "aggregation_value": 1512}
+    },
+    {
+      "id": "GQ008",
+      "category": "flight_aircraft_filter",
+      "prompts": [
+        "List every flight operated by aircraft VT-DXC.",
+        "Show the route sectors assigned to tail VT-DXC across the snapshot."
+      ],
+      "expected_tool": "query_operations",
+      "expected_plan": {
+        "resource": "flights",
+        "filters": {"aircraft": "VT-DXC"},
+        "fields": ["flight_id", "origin", "destination"],
+        "sort": ["flight_id"],
+        "limit": 500
+      },
+      "expected": {"count": 21, "rows_include_flight_ids": ["DX412-2026-09-15", "DX591-2026-09-20"]}
+    },
+    {
+      "id": "GQ009",
+      "category": "crew_count_with_filters",
+      "prompts": [
+        "How many active captains are based at BLR?",
+        "Count currently active Bengaluru-based Captains."
+      ],
+      "expected_tool": "query_operations",
+      "expected_plan": {
+        "resource": "crew",
+        "filters": {"status": "active", "base": "BLR", "rank": "Captain"},
+        "fields": ["crew_id", "name"],
+        "sort": ["name"],
+        "aggregation": {"function": "count"},
+        "limit": 500
+      },
+      "expected": {"count": 24, "aggregation_value": 24, "rows_include_crew_ids": ["C-1042", "C-3310"]}
+    },
+    {
+      "id": "GQ010",
+      "category": "crew_filter",
+      "prompts": [
+        "Who are the active Captains based in DEL?",
+        "List active Delhi-base crew whose rank is Captain."
+      ],
+      "expected_tool": "query_operations",
+      "expected_plan": {
+        "resource": "crew",
+        "filters": {"status": "active", "base": "DEL", "rank": "Captain"},
+        "fields": ["crew_id", "name"],
+        "sort": ["name"],
+        "limit": 500
+      },
+      "expected": {"count": 1, "ordered_crew_ids": ["C-2210"]}
+    },
+    {
+      "id": "GQ011",
+      "category": "crew_json_membership",
+      "prompts": [
+        "How many active crew members hold an A320 rating?",
+        "Count active crew qualified on A320 and list their names and ranks."
+      ],
+      "expected_tool": "query_operations",
+      "expected_plan": {
+        "resource": "crew",
+        "filters": {"status": "active", "rating": "A320"},
+        "fields": ["crew_id", "name", "rank"],
+        "sort": ["rank", "name"],
+        "aggregation": {"function": "count"},
+        "limit": 500
+      },
+      "expected": {"count": 115, "aggregation_value": 115}
+    },
+    {
+      "id": "GQ012",
+      "category": "crew_top_n",
+      "prompts": [
+        "Show the five active BLR crew with the shortest reachability time.",
+        "Who are the quickest five active Bengaluru crew to reach?"
+      ],
+      "expected_tool": "query_operations",
+      "expected_plan": {
+        "resource": "crew",
+        "filters": {"status": "active", "base": "BLR"},
+        "fields": ["crew_id", "name", "rank", "reachability_minutes"],
+        "sort": ["reachability_minutes", "name"],
+        "limit": 5
+      },
+      "expected": {
+        "count": 5,
+        "ordered_crew_ids": ["C-5647", "C-1594", "C-3145", "C-3211", "C-3334"],
+        "all_reachability_minutes": 45
+      }
+    },
+    {
+      "id": "GQ013",
+      "category": "crew_status_filter",
+      "prompts": [
+        "List all crew currently on leave with their rank and base.",
+        "Who has leave status in the crew roster?"
+      ],
+      "expected_tool": "query_operations",
+      "expected_plan": {
+        "resource": "crew",
+        "filters": {"status": "leave"},
+        "fields": ["crew_id", "name", "rank", "base"],
+        "sort": ["base", "rank", "name"],
+        "limit": 500
+      },
+      "expected": {"count": 6, "ordered_crew_ids": ["C-4621", "C-2561", "C-1564", "C-2442", "C-5015", "C-1606"]}
+    },
+    {
+      "id": "GQ014",
+      "category": "crew_distinct",
+      "prompts": [
+        "What distinct crew bases have active personnel?",
+        "List the unique bases represented by active crew."
+      ],
+      "expected_tool": "query_operations",
+      "expected_plan": {
+        "resource": "crew",
+        "filters": {"status": "active"},
+        "fields": ["base"],
+        "aggregation": {"function": "distinct", "field": "base"},
+        "sort": ["base"],
+        "limit": 500
+      },
+      "expected": {"aggregation_count": 2, "aggregation_value": ["BLR", "DEL"]}
+    },
+    {
+      "id": "GQ015",
+      "category": "crew_average",
+      "prompts": [
+        "What is the average seniority of active Captains?",
+        "Calculate mean seniority for Captains with active status."
+      ],
+      "expected_tool": "query_operations",
+      "expected_plan": {
+        "resource": "crew",
+        "filters": {"status": "active", "rank": "Captain"},
+        "fields": ["seniority"],
+        "aggregation": {"function": "avg", "field": "seniority"},
+        "limit": 500
+      },
+      "expected": {"count": 25, "aggregation_value": 12.12}
+    },
+    {
+      "id": "GQ016",
+      "category": "pairing_count",
+      "prompts": [
+        "How many pairing duties operate on 15 Sep 2026?",
+        "Count the pairings with a duty day on 2026-09-15."
+      ],
+      "expected_tool": "query_operations",
+      "expected_plan": {
+        "resource": "pairings",
+        "filters": {"date": "2026-09-15"},
+        "fields": ["pairing_id"],
+        "aggregation": {"function": "count"},
+        "sort": ["pairing_id"],
+        "limit": 500
+      },
+      "expected": {"count": 6, "aggregation_value": 6}
+    },
+    {
+      "id": "GQ017",
+      "category": "pairing_aircraft_filter",
+      "prompts": [
+        "Show all pairing days flown by VT-DXC.",
+        "Which pairings and flights are assigned to aircraft VT-DXC?"
+      ],
+      "expected_tool": "query_operations",
+      "expected_plan": {
+        "resource": "pairings",
+        "filters": {"aircraft": "VT-DXC"},
+        "fields": ["pairing_id", "date", "flights_json"],
+        "sort": ["date"],
+        "limit": 500
+      },
+      "expected": {"count": 7, "rows_include_pairing_ids": ["P-2289", "P-2291", "P-2293", "P-2295"]}
+    },
+    {
+      "id": "GQ018",
+      "category": "pairing_detail",
+      "prompts": [
+        "List every duty day and flight in pairing P-2291.",
+        "Show the report, release, and sectors for all days of P-2291."
+      ],
+      "expected_tool": "query_operations",
+      "expected_plan": {
+        "resource": "pairings",
+        "filters": {"pairing_id": "P-2291"},
+        "fields": ["pairing_id", "date", "report_utc", "release_utc", "flights_json"],
+        "sort": ["date"],
+        "limit": 500
+      },
+      "expected": {
+        "count": 2,
+        "ordered_dates": ["2026-09-15", "2026-09-16"],
+        "first_day_flights": ["DX412-2026-09-15", "DX413-2026-09-15", "DX588-2026-09-15"]
+      }
+    },
+    {
+      "id": "GQ019",
+      "category": "reserve_count",
+      "prompts": [
+        "How many active reserves are available at BLR on 15 Sep?",
+        "Count the Bengaluru reserve roster for 2026-09-15 and show their windows."
+      ],
+      "expected_tool": "query_operations",
+      "expected_plan": {
+        "resource": "reserves",
+        "filters": {"date": "2026-09-15", "base": "BLR"},
+        "fields": ["crew_id", "name", "rank", "on_call_start", "on_call_end"],
+        "sort": ["on_call_start", "crew_id"],
+        "aggregation": {"function": "count"},
+        "limit": 500
+      },
+      "expected": {"count": 12, "aggregation_value": 12}
+    },
+    {
+      "id": "GQ020",
+      "category": "reserve_filtered_count",
+      "prompts": [
+        "Which Captain reserves are at BLR on 15 September, and how many are there?",
+        "Count BLR Captain reserves for 2026-09-15 and list their call windows."
+      ],
+      "expected_tool": "query_operations",
+      "expected_plan": {
+        "resource": "reserves",
+        "filters": {"date": "2026-09-15", "base": "BLR", "rank": "Captain"},
+        "fields": ["crew_id", "name", "on_call_start", "on_call_end"],
+        "sort": ["on_call_start"],
+        "aggregation": {"function": "count"},
+        "limit": 500
+      },
+      "expected": {"count": 3, "aggregation_value": 3, "ordered_crew_ids": ["C-3305", "C-3315", "C-3310"]}
+    },
+    {
+      "id": "GQ021",
+      "category": "reserve_distinct",
+      "prompts": [
+        "Which bases have reserve coverage on 15 Sep?",
+        "List unique reserve bases represented on 2026-09-15."
+      ],
+      "expected_tool": "query_operations",
+      "expected_plan": {
+        "resource": "reserves",
+        "filters": {"date": "2026-09-15"},
+        "fields": ["base"],
+        "aggregation": {"function": "distinct", "field": "base"},
+        "sort": ["base"],
+        "limit": 500
+      },
+      "expected": {"aggregation_count": 2, "aggregation_value": ["BLR", "DEL"]}
+    },
+    {
+      "id": "GQ022",
+      "category": "certification_filter",
+      "prompts": [
+        "List all certifications and expiry dates for C-1042.",
+        "How many certification records does crew member C-1042 have?"
+      ],
+      "expected_tool": "query_operations",
+      "expected_plan": {
+        "resource": "certifications",
+        "filters": {"crew_id": "C-1042"},
+        "fields": ["cert_type", "valid_to"],
+        "sort": ["cert_type"],
+        "aggregation": {"function": "count"},
+        "limit": 500
+      },
+      "expected": {
+        "count": 4,
+        "aggregation_value": 4,
+        "ordered_cert_types": ["dangerous_goods", "licence", "medical_class1", "recurrent_training"]
+      }
+    },
+    {
+      "id": "GQ023",
+      "category": "risk_top_n",
+      "prompts": [
+        "Show the five crew members with the highest disruption risk scores.",
+        "Who are the top 5 highest-risk crew in the current snapshot?"
+      ],
+      "expected_tool": "query_operations",
+      "expected_plan": {
+        "resource": "risk_signals",
+        "fields": ["crew_id", "name", "rank", "base", "score"],
+        "sort": ["-score", "crew_id"],
+        "limit": 5
+      },
+      "expected": {
+        "count": 5,
+        "ordered_crew_ids": ["C-1042", "C-3940", "C-1938", "C-5417", "C-5392"],
+        "ordered_scores": [0.78, 0.71, 0.69, 0.64, 0.41]
+      }
+    },
+    {
+      "id": "GQ024",
+      "category": "risk_maximum",
+      "prompts": [
+        "What is the highest disruption risk score in the roster?",
+        "Return the maximum current crew risk score."
+      ],
+      "expected_tool": "query_operations",
+      "expected_plan": {
+        "resource": "risk_signals",
+        "fields": ["score"],
+        "aggregation": {"function": "max", "field": "score"},
+        "limit": 500
+      },
+      "expected": {"count": 150, "aggregation_value": 0.78}
+    },
+    {
+      "id": "GQ025",
+      "category": "duty_threshold",
+      "prompts": [
+        "Give me every crew member whose weekly duty hours are less than 60, with name and rank.",
+        "List crew below 60 hours in the rolling seven-day duty window."
+      ],
+      "expected_tool": "query_operations",
+      "expected_plan": {
+        "resource": "crew_duty",
+        "fields": ["crew_id", "name", "rank", "duty_hours_7d"],
+        "aggregation": {"metric": "duty_hours_7d", "operator": "<", "value": 60},
+        "sort": ["duty_hours_7d", "name"],
+        "limit": 500,
+        "as_of_date": "2026-09-14",
+        "window_days": 7
+      },
+      "expected": {"count": 150, "all_duty_hours_operator": "<", "all_duty_hours_value": 60}
+    },
+    {
+      "id": "GQ026",
+      "category": "duty_threshold_active",
+      "prompts": [
+        "Which active crew have accumulated at least 45 duty hours this week?",
+        "List active crew at or above 45 hours in the rolling 7-day duty window."
+      ],
+      "expected_tool": "query_operations",
+      "expected_plan": {
+        "resource": "crew_duty",
+        "filters": {"status": "active"},
+        "fields": ["crew_id", "name", "rank", "duty_hours_7d"],
+        "aggregation": {"metric": "duty_hours_7d", "operator": ">=", "value": 45},
+        "sort": ["-duty_hours_7d"],
+        "limit": 500,
+        "as_of_date": "2026-09-14",
+        "window_days": 7
+      },
+      "expected": {"count": 2, "ordered_crew_ids": ["C-3305", "C-2087"], "ordered_duty_hours": [56.4, 51.83]}
+    },
+    {
+      "id": "GQ027",
+      "category": "duty_top_n",
+      "prompts": [
+        "Who are the five active crew with the highest weekly duty hours?",
+        "Show the top 5 active crew by rolling seven-day duty time."
+      ],
+      "expected_tool": "query_operations",
+      "expected_plan": {
+        "resource": "crew_duty",
+        "filters": {"status": "active"},
+        "fields": ["crew_id", "name", "rank", "duty_hours_7d"],
+        "sort": ["-duty_hours_7d", "name"],
+        "limit": 5,
+        "as_of_date": "2026-09-14",
+        "window_days": 7
+      },
+      "expected": {
+        "count": 5,
+        "ordered_crew_ids": ["C-3305", "C-2087", "C-4531", "C-3569", "C-4999"],
+        "ordered_duty_hours": [56.4, 51.83, 31.21, 30.93, 30.92]
+      }
+    },
+    {
+      "id": "GQ028",
+      "category": "duty_multi_filter",
+      "prompts": [
+        "List active DEL-based crew under 60 weekly duty hours with their ranks.",
+        "Which active Delhi crew remain below the 60-hour rolling duty limit?"
+      ],
+      "expected_tool": "query_operations",
+      "expected_plan": {
+        "resource": "crew_duty",
+        "filters": {"status": "active", "base": "DEL"},
+        "fields": ["crew_id", "name", "rank", "duty_hours_7d"],
+        "aggregation": {"metric": "duty_hours_7d", "operator": "<", "value": 60},
+        "sort": ["rank", "name"],
+        "limit": 500,
+        "as_of_date": "2026-09-14",
+        "window_days": 7
+      },
+      "expected": {"count": 9, "rows_include_crew_ids": ["C-2210", "C-5020", "C-1622"]}
+    },
+    {
+      "id": "GQ029",
+      "category": "duty_average",
+      "prompts": [
+        "What is the average rolling seven-day duty time for active Captains?",
+        "Calculate mean weekly duty hours across active Captain crew."
+      ],
+      "expected_tool": "query_operations",
+      "expected_plan": {
+        "resource": "crew_duty",
+        "filters": {"status": "active", "rank": "Captain"},
+        "fields": ["duty_hours_7d"],
+        "aggregation": {"function": "avg", "field": "duty_hours_7d"},
+        "sort": ["duty_hours_7d"],
+        "limit": 500,
+        "as_of_date": "2026-09-14",
+        "window_days": 7
+      },
+      "expected": {"count": 25, "aggregation_value": 22.4544}
+    }
+  ],
+  "unsupported_boundary_cases": [
+    {
+      "id": "GQ-U01",
+      "prompt": "Group active crew by base and rank and count each group.",
+      "missing_capability": "group_by",
+      "expected_behavior": "State that grouped aggregation is not supported by the current query plan; do not fabricate grouped counts."
+    },
+    {
+      "id": "GQ-U02",
+      "prompt": "Show flights between 15 and 18 September with more than 150 seats.",
+      "missing_capability": "range_and_comparison_filters",
+      "expected_behavior": "State that non-duty range/comparison filters are unsupported or request a narrower exact filter."
+    },
+    {
+      "id": "GQ-U03",
+      "prompt": "Which active crew are not assigned to any pairing on 15 September?",
+      "missing_capability": "anti_join",
+      "expected_behavior": "State that the current generalized query resource cannot perform this anti-join; do not infer from partial lists."
+    },
+    {
+      "id": "GQ-U04",
+      "prompt": "Compare average duty hours between BLR and DEL crew.",
+      "missing_capability": "grouped_comparison",
+      "expected_behavior": "State that grouped comparative aggregation is not supported in one plan."
+    },
+    {
+      "id": "GQ-U05",
+      "prompt": "Predict which crew member will call in sick next month.",
+      "missing_capability": "forecasting",
+      "expected_behavior": "Explain that the dataset contains current risk signals, not a validated future absence prediction."
+    }
+  ]
+}

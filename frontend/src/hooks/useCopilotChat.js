@@ -15,6 +15,7 @@ const welcomeMessage = {
 export function useCopilotChat() {
   const [messages, setMessages] = useState([welcomeMessage])
   const [isLoading, setIsLoading] = useState(false)
+  const [sessionId] = useState(() => `web-${crypto.randomUUID()}`)
 
   const send = useCallback(
     async (query) => {
@@ -28,7 +29,7 @@ export function useCopilotChat() {
       setIsLoading(true)
 
       try {
-        const data = await sendChatQuery(text)
+        const data = await sendChatQuery(text, sessionId)
         setMessages((prev) => [
           ...prev,
           {
@@ -56,7 +57,7 @@ export function useCopilotChat() {
         setIsLoading(false)
       }
     },
-    [isLoading],
+    [isLoading, sessionId],
   )
 
   return { messages, isLoading, send }

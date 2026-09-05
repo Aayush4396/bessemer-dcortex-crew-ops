@@ -232,7 +232,7 @@ def should_continue(state: AgentState) -> Literal["tools", "__end__"]:
 
 def deterministic_router_node(state: AgentState) -> dict[str, Any]:
     """Resolve supported deterministic intents before invoking the external model."""
-    routed = route_deterministic_query(state["user_query"])
+    routed = route_deterministic_query(state["user_query"], state.get("active_entities"))
     if routed is None:
         return {}
 

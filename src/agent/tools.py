@@ -25,6 +25,7 @@ from src.tier1 import (
 from src.resolver import (
     check_cover as _check_cover,
     cover_options as _cover_options,
+    evaluate_replacement_candidate as _evaluate_replacement_candidate,
     expand_sick_call as _expand_sick_call,
     expand_station_closure as _expand_station_closure,
     expand_delay as _expand_delay,
@@ -304,6 +305,7 @@ def check_crew_cover_legality(
     pairing_id: str,
     exclude_pairing: str | None = None,
     delay_hours: float = 0.0,
+    replaces_crew_id: str | None = None,
 ) -> dict[str, Any]:
     """
     Simulate whether a crew member can legally cover a pairing (all days).
@@ -315,6 +317,8 @@ def check_crew_cover_legality(
     - exclude_pairing: Pairing to remove from the crew's existing roster before simulation (e.g. if they are being swapped)
     - delay_hours: Hours the first departure is delayed (e.g. due to deadhead positioning)
     """
+    if replaces_crew_id:
+        return _evaluate_replacement_candidate(crew_id, pairing_id, replaces_crew_id)
     p = _find_pairing(pairing_id)
     ok, issues = _check_cover(crew_id, p["days"], exclude_pairing=exclude_pairing, delay_h=delay_hours)
     return {"crew_id": crew_id, "pairing_id": pairing_id, "legal": ok, "issues": issues}
@@ -343,15 +347,17 @@ def get_cover_options(
 @tool
 def analyze_sick_call(
     crew_id: str,
-    pairing_id: str,
+    pairing_id: str | None = None,
+    event_date: str | None = None,
 ) -> dict[str, Any]:
     """
     Analyze a sick call: which flights are uncovered, how many passengers are at risk.
     Parameters:
     - crew_id: The sick crew member's ID (e.g. "C-1042")
-    - pairing_id: Their pairing ID (e.g. "P-2291")
+    - pairing_id: Their pairing ID (e.g. "P-2291"), optional when event_date is supplied
+    - event_date: Duty date in YYYY-MM-DD format, used to resolve the pairing when omitted
     """
-    return _expand_sick_call(crew_id, pairing_id)
+    return _expand_sick_call(crew_id, pairing_id, event_date)
 
 
 @tool

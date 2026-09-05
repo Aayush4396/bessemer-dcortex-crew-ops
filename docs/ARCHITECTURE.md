@@ -113,7 +113,7 @@ flowchart TB
 
 ### Current implementation boundary
 
-The deterministic resolver and agent tools for Tier 2 and Tier 3 are implemented. Tier 2 and Tier 3 are accessed through `POST /api/chat` and the LangGraph tool loop; there are no separate simulation or recovery REST routes.
+The deterministic resolver and agent tools for Tier 2 and Tier 3 are implemented and routed through a multi-pattern deterministic intent router. Most T2/T3 questions are answered entirely in Python without an LLM call; only prose-generation tasks (callout drafts, briefing recommendations) and unmatched patterns reach the Sarvam-105B model. All tiers are accessed through `POST /api/chat`; there are no separate simulation or recovery REST routes.
 
 ## 3. Source Data and Ingestion
 
@@ -340,6 +340,26 @@ The graph has three nodes:
 The conditional edge loops back to `agent` when tool calls exist and ends after a final response. A six-tool-call safety limit prevents runaway loops. Historical tool payloads are compacted before later turns, while active aviation entities such as crew, flight, aircraft, and pairing IDs are retained for pronoun resolution.
 
 The LLM is therefore responsible for intent interpretation, parameter selection, and response wording. It is not trusted for database facts or arithmetic.
+
+### Deterministic router priority
+
+The deterministic router in `src/agent/deterministic_router.py` evaluates intent patterns in a fixed priority order. The first match wins; unmatched queries fall through to the LLM agent node.
+
+```text
+1. LLM prose bypass       — "draft", "compose", "briefing" → skip to LLM
+2. Legality check          — crew + pairing + "breach"/"legal" → evaluate_replacement_candidate
+3. Candidate cover         — "can C-XXXX cover/replace" → evaluate_replacement_candidate
+4. Sick call               — "sick"/"unavailable" + crew + pairing → expand_sick_call
+5. Replacement options     — "who can cover"/"replacement" → cover_options
+6. Delay impact            — aircraft + delay amount + date → expand_delay
+7. Station closure         — station + "closed" + time window → expand_station_closure
+8. Ranked recovery options — "ranked"/"cheapest legal"/"optimal" → cover_options
+9. Tier 1 general planner  — crew/flight/pairing/reserve keywords → query_operations
+10. Duty threshold         — "weekly duty" + "</>/ 60 hours" → query_operations
+11. No match               → LLM agent with full tool schemas
+```
+
+Steps 2–3 auto-resolve the incumbent crew member from SQLite when only the candidate and pairing are provided. Step 8 resolves aircraft registration (VT-XXX) to pairing and role to incumbent when needed.
 
 ## 7. Tier 1 Deterministic Query Layer
 
@@ -629,7 +649,9 @@ Current tool groups:
 - Tier 2/3 group: `check_crew_cover_legality`, `get_cover_options`, `analyze_sick_call`, `analyze_station_closure`, `analyze_delay_impact`, and `compute_duty_window`.
 - Generalized queries: `query_operations` supports allowlisted resources, filters, fields, sorting, limits, thresholds, counts, distinct values, and numeric aggregations.
 
-The agent currently binds `ALL_TOOLS`. The `tier` request value is returned and persisted, but tool availability is not yet isolated into separate Tier 1, Tier 2, and Tier 3 registries.
+The agent binds `ALL_TOOLS` to the LLM. In practice, most operational queries are intercepted by the deterministic router before reaching the LLM. The router handles all pattern-matched intents (sick calls, legality checks, delay/closure analysis, replacement ranking) entirely in Python, using the resolver and T1 query modules. The LLM is only invoked for queries that require prose generation (callout drafts, briefing recommendations) or that don't match any deterministic pattern.
+
+The `tier` request value is returned and persisted in the session record. Tool availability is not isolated into separate tier registries; the deterministic router's pattern priority implicitly selects the appropriate tier.
 
 ## 13. REST and Frontend Flow
 
@@ -690,8 +712,8 @@ Current verified results:
 - Tier 1 evaluator: `Q01`–`Q16`, 16/16 passed.
 - Tier 2/3 evaluator: 19/19 testable questions passed; Q30, Q36, and Q38 are rubric-graded skips.
 - Scenario evaluator: S1–S6, 6/6 passed.
+- Deterministic routing: 14/22 T2/T3 questions answered without LLM; 4 correctly deferred to LLM for prose.
 - Dataset validator: internally consistent.
-- The local `.venv/bin/python.exe` environment currently lacks `pytest`; the evaluator scripts run successfully without pytest.
 
 The benchmark fixtures are the grading specification. In particular, `generate.py` defines the expected candidate enumeration and costing semantics; the broader regulatory descriptions in `README.md` should not be treated as implemented behavior when they differ from `data/rules.json` and the answer keys.
 
@@ -710,14 +732,23 @@ The following invariants should be preserved when extending the system:
 9. Keep scenario answer keys independent; scenarios do not chain state.
 10. Expose tool arguments, raw results, and reasoning traces for explainability.
 
-## 16. Next Integration Work
+## 16. Current Routing Coverage and Next Work
 
-The remaining work to make the architecture fully end to end is concentrated at the chat and frontend boundary:
+### Benchmark routing (Q17–Q38)
 
-1. Add explicit tier selection to the frontend copilot.
-2. Add a dedicated joint optimizer for simultaneous absences.
-3. Connect frontend recovery/simulation screens to `/api/chat` with structured prompts or dedicated chat actions.
-4. Add API integration tests for resolver tool dispatch and scenario payloads.
+Of the 22 Tier 2/3 benchmark questions:
+
+- **14 deterministic**: routed and answered entirely in Python without an LLM call (sick calls, legality checks, delay impact, station closure, replacement ranking, cover options).
+- **4 LLM prose**: correctly deferred to the LLM for generation tasks (callout drafts, briefing recommendations, training-lapse resolution, cancellation analysis).
+- **4 passable T1**: answered by the generalized T1 query planner with correct data but less structured formatting than the ideal T2/T3 response (rest calculation, duty threshold, seat risk, FDP action).
+
+### Remaining integration work
+
+1. Add deterministic routes for the four passable-T1 questions: rest calculation (Q23), duty threshold with filtering (Q26), single-flight seat risk (Q30), and FDP breach action recommendation (Q33).
+2. Add a dedicated joint optimizer for simultaneous multi-pairing absences (Q32 currently returns per-pairing options independently).
+3. Add explicit tier selection to the frontend copilot.
+4. Connect frontend recovery/simulation screens to `/api/chat` with structured prompts or dedicated chat actions.
+5. Add API integration tests for resolver tool dispatch and scenario payloads.
 
 ## 17. Rubric Alignment and Honest Limitations
 

@@ -115,6 +115,77 @@ def test_chat_weekly_duty_query_does_not_require_external_model():
     assert data["tool_results"][0]["result"]["count"] == 150
 
 
+def test_chat_sick_call_query_does_not_require_external_model():
+    query = "Captain C-1042 calls in sick at 05:00Z on 15 Sep for pairing P-2291. Which flights are immediately uncrewed?"
+    with patch("src.agent.graph.get_llm", side_effect=AssertionError("LLM must not be called")):
+        res = client.post(
+            "/api/chat",
+            json={"query": query, "tier": 2, "session_id": "session-sick-call-offline-test"},
+        )
+
+    assert res.status_code == 200
+    data = res.json()
+    assert data["tool_calls"][0]["name"] == "analyze_sick_call"
+    assert data["tool_results"][0]["result"]["passengers_at_risk_day1"] == 486
+    assert "DX412" in data["response"]
+
+
+def test_chat_sick_call_resolves_pairing_when_omitted():
+    query = "Captain C-1042 calls in unavailable at 05:00Z on 15 Sep. Which flights are immediately uncrewed?"
+    with patch("src.agent.graph.get_llm", side_effect=AssertionError("LLM must not be called")):
+        res = client.post(
+            "/api/chat",
+            json={"query": query, "tier": 2, "session_id": "session-sick-call-inference-test"},
+        )
+
+    assert res.status_code == 200
+    data = res.json()
+    assert data["tool_calls"][0]["args"]["pairing_id"] == "P-2291"
+    assert "DX412" in data["response"]
+
+
+def test_chat_replacement_query_does_not_require_external_model():
+    query = "who can be the replacement captain for pairing P-2291?"
+    with patch("src.agent.graph.get_llm", side_effect=AssertionError("LLM must not be called")):
+        res = client.post(
+            "/api/chat",
+            json={"query": query, "tier": 3, "session_id": "session-replacement-offline-test"},
+        )
+
+    assert res.status_code == 200
+    data = res.json()
+    assert data["tool_calls"][0]["name"] == "get_cover_options"
+    assert data["tool_results"][0]["result"]["options"][0]["crew_id"] == "C-3310"
+
+
+def test_chat_candidate_follow_up_uses_persisted_session_context():
+    session_id = "session-contextual-candidate-test"
+    with patch("src.agent.graph.get_llm", side_effect=AssertionError("LLM must not be called")):
+        first = client.post(
+            "/api/chat",
+            json={
+                "query": "who can be the replacement captain for pairing P-2291?",
+                "tier": 3,
+                "session_id": session_id,
+            },
+        )
+        follow_up = client.post(
+            "/api/chat",
+            json={
+                "query": "can C-3311 replace for C-1042?",
+                "tier": 3,
+                "session_id": session_id,
+            },
+        )
+
+    assert first.status_code == 200
+    assert follow_up.status_code == 200
+    data = follow_up.json()
+    assert data["tool_results"][0]["result"]["legal"] is False
+    assert "First Officer" in data["response"]
+    assert "Captain" in data["response"]
+
+
 def test_sessions_lifecycle():
     """Verify full CRUD lifecycle of session REST endpoints."""
     # 1. Create session
