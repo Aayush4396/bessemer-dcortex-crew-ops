@@ -67,8 +67,8 @@ export function AppSidebar({ pairingCount = 0, crewCount = 0 }) {
                   'flex items-center rounded-lg py-2 text-sm',
                   collapsed ? 'justify-center px-0' : 'justify-between px-3',
                   (item.to === '/' ? pairingsActive : item.to === '/crew' ? crewActive : isActive)
-                    ? 'bg-emerald-50 font-semibold text-emerald-800'
-                    : 'text-slate-600 hover:bg-slate-100',
+                    ? 'bg-emerald-50 font-semibold text-emerald-600'
+                    : 'text-slate-700 hover:bg-slate-100',
                 )
               }
             >

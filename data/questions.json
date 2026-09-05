@@ -547,10 +547,12 @@
   "tier": 2,
   "prompt": "Which single flight leg has the most seats at risk if cancelled, and why?",
   "expected_answer": {
-   "flights": "any A320 leg (162 seats)",
-   "vs": "ATR72 legs (72 seats)"
+   "by_type": [
+    {"aircraft_type": "A320", "max_seats": 162},
+    {"aircraft_type": "ATR72", "max_seats": 72}
+   ]
   },
-  "explanation": "Seats come from aircraft_type; A320 legs dominate.",
+  "explanation": "MAX(seats) per aircraft_type; A320 is 162, ATR72 is 72.",
   "rules_ref": []
  },
  {

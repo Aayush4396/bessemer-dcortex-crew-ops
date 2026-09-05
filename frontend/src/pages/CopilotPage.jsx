@@ -21,7 +21,7 @@ export function CopilotPage() {
   } = useCopilotChat()
 
   return (
-    <div className="flex h-full min-h-0 w-full overflow-hidden">
+    <div className="flex h-full min-h-0 w-full overflow-hidden bg-[#eef1f5]">
       <SessionSidebar
         sessions={sessions}
         activeSessionId={activeSessionId}
@@ -34,13 +34,11 @@ export function CopilotPage() {
       />
 
       <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-4 p-6 overflow-hidden">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-lg font-semibold text-slate-900">Tactical Copilot</h1>
-            <p className="text-sm text-slate-500">
-              Multi-turn operational lookups over live schedules and rosters with SQLite persistence.
-            </p>
-          </div>
+        <div>
+          <h1 className="text-lg font-semibold text-slate-900">Tactical Copilot</h1>
+          <p className="text-sm text-slate-500">
+            Multi-turn operational lookups over live schedules and rosters with SQLite persistence.
+          </p>
         </div>
 
         <Card className="flex min-h-0 flex-1 flex-col overflow-hidden p-0">

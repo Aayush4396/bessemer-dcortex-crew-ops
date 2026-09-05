@@ -801,7 +801,7 @@ q(2, f"Captain {sA} (VT-DXA line, works 14/17/20 Sep) is proposed to cover P-229
 q(2, "Station HYD is closed 05:00–09:00Z on 19 Sep. Which flights are affected?",
   aff8, "Same window logic as S3 applied to HYD.", [])
 q(2, "Which single flight leg has the most seats at risk if cancelled, and why?",
-  {"flights": "any A320 leg (162 seats)", "vs": "ATR72 legs (72 seats)"},
+  {"by_type": [{"aircraft_type": "A320", "max_seats": 162}, {"aircraft_type": "ATR72", "max_seats": 72}]},
   "Seats come from aircraft_type; A320 legs dominate.", [])
 
 # Tier 3

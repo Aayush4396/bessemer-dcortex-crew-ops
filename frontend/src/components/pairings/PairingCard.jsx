@@ -115,43 +115,43 @@ export function PairingCard({ pairing }) {
 
   return (
     <Link to={`/pairings/${pairing.pairing_id}`} className="block">
-    <Card
-      className={cn(
-        'overflow-hidden border-l-4 text-left transition-shadow hover:shadow-md',
-        accent[pairing.risk_level] || accent.low,
-      )}
-    >
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-4 py-3">
-        <div className="flex flex-wrap items-center gap-2">
-          <p className="text-sm font-semibold text-slate-900">{pairing.pairing_id}</p>
-          <Badge>{pairing.rotation_label}</Badge>
-          <p className="text-xs text-slate-500">{pairing.route.join(' → ')}</p>
+      <Card
+        className={cn(
+          'overflow-hidden border-l-4 text-left transition-shadow hover:shadow-md',
+          accent[pairing.risk_level] || accent.low,
+        )}
+      >
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-4 py-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <p className="text-sm font-semibold text-slate-900">{pairing.pairing_id}</p>
+            <Badge>{pairing.rotation_label}</Badge>
+            <p className="text-xs text-slate-500">{pairing.route.join(' → ')}</p>
+          </div>
+          <Badge variant={badgeVariant}>RISK {pairing.risk_score.toFixed(2)}</Badge>
         </div>
-        <Badge variant={badgeVariant}>RISK {pairing.risk_score.toFixed(2)}</Badge>
-      </div>
 
-      <div className="flex gap-4 px-4 py-4">
-        <div className="min-w-0 flex-1 overflow-x-auto">
-          <table className="w-full border-separate border-spacing-y-3">
-            <tbody>
-              {table.getRowModel().rows.map((row, index) => (
-                <tr key={row.id} className={index > 0 ? 'border-t border-slate-100' : undefined}>
-                  {row.getAllCells().map((cell) => (
-                    <td
-                      key={cell.id}
-                      className={cell.column.id === 'duty' ? 'w-[240px] align-top pr-4' : 'align-top'}
-                    >
-                      <table.FlexRender cell={cell} />
-                    </td>
-                  ))}
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <div className="flex gap-4 px-4 py-4">
+          <div className="min-w-0 flex-1 overflow-x-auto">
+            <table className="w-full border-separate border-spacing-y-3">
+              <tbody>
+                {table.getRowModel().rows.map((row, index) => (
+                  <tr key={row.id} className={index > 0 ? 'border-t border-slate-100' : undefined}>
+                    {row.getAllCells().map((cell) => (
+                      <td
+                        key={cell.id}
+                        className={cell.column.id === 'duty' ? 'w-[240px] align-top pr-4' : 'align-top'}
+                      >
+                        <table.FlexRender cell={cell} />
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <AssignedRoster roster={pairing.roster} />
         </div>
-        <AssignedRoster roster={pairing.roster} />
-      </div>
-    </Card>
+      </Card>
     </Link>
   )
 }

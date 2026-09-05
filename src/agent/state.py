@@ -21,5 +21,6 @@ class AgentState(TypedDict):
     active_entities: dict[str, str]
     tool_calls: list[dict[str, Any]]
     tool_results: list[dict[str, Any]]
+    tool_hops: int
     reasoning_trace: list[str]
     final_response: str

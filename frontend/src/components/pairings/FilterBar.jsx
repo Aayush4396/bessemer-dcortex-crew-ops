@@ -93,7 +93,7 @@ export function FilterBar({ weekDays = [], date, aircraft, risk, tails = [], ris
               className={cn(
                 'inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold transition-all',
                 selected
-                  ? 'bg-slate-900 text-white shadow-sm'
+                  ? 'bg-emerald-600 text-white shadow-sm'
                   : 'bg-slate-100 text-slate-500 hover:bg-slate-200 hover:text-slate-800',
               )}
             >
