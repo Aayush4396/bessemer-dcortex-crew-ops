@@ -51,6 +51,24 @@ def test_simulate_placeholder():
     assert len(data["scenarios"]) == 6
 
 
+def test_simulate_active_disruption():
+    """Verify POST /api/simulate with payload runs real Tier 2 impact simulation."""
+    payload = {
+        "type": "SICK_CREW",
+        "crew_id": "C-3231",
+        "pairing_id": "P-2224",
+        "reported_utc": "2026-09-16T01:30:00Z",
+    }
+    res = client.post("/api/simulate", json=payload)
+    assert res.status_code == 200
+    data = res.json()
+    assert data["status"] == "success"
+    assert data["tier"] == 2
+    assert "impact" in data
+    assert data["impact"]["passengers_at_risk"] == 288
+    assert len(data["impact"]["uncovered_flights"]) == 4
+
+
 def test_recover_placeholder():
     """Verify POST /api/recover returns Tier 3 placeholder info."""
     res = client.post("/api/recover")
@@ -59,6 +77,24 @@ def test_recover_placeholder():
     assert data["status"] == "placeholder"
     assert data["tier"] == 3
     assert len(data["capabilities"]) == 4
+
+
+def test_recover_active_event():
+    """Verify POST /api/recover with payload runs real Tier 3 recovery optimizer."""
+    payload = {
+        "type": "SICK_CREW",
+        "crew_id": "C-1042",
+        "pairing_id": "P-2291",
+        "reported_utc": "2026-09-15T05:00:00Z",
+    }
+    res = client.post("/api/recover", json=payload)
+    assert res.status_code == 200
+    data = res.json()
+    assert data["status"] == "success"
+    assert data["tier"] == 3
+    assert "recovery" in data
+    assert data["recovery"]["expected_choice"]["crew_id"] == "C-3310"
+    assert data["recovery"]["expected_choice"]["cost_inr"] == 18500
 
 
 def test_chat_empty_query():

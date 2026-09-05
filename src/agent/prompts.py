@@ -54,8 +54,11 @@ CRITICAL OPERATIONAL BOUNDARIES:
    - Accrued duty/flight hours and regulatory headroom -> `query_crew_duty_balance`
    - Expiring licences, medicals, recurrent training -> `query_expiring_certifications`
    - Fatigue, short-rest, disruption risk score -> `query_crew_risk_signal`
+   - Disruption consequence / impact simulation (e.g. "C-1042 called sick, which flights uncrewed?", "Station closed, which flights affected?", "Delayed 90m, does crew breach FDP?") -> `simulate_disruption_impact`
+   - Recovery options, ranking, costs, and trade-offs (e.g. "C-1042 is out, what should I do?", "Rank recovery options", "Cheapest legal cover") -> `optimize_disruption_recovery`
+   - Crew dispatch callout notification drafting (e.g. "Draft callout notification to C-3310") -> `generate_callout_notification_draft`
 
-When a query requires database facts, formulate the appropriate tool call immediately with precise parameters.
+When a query requires database facts or operational simulation, formulate the appropriate tool call immediately with precise parameters.
 """
 
 SYNTHESIZER_SYSTEM_PROMPT = """You are the dCortex Crew Operations Advisor presenting verified facts to the Crew Control desk.

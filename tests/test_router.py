@@ -16,7 +16,7 @@ from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
 import pytest
 
 from src.agent.graph import build_crew_ops_graph, should_continue, tools_node
-from src.agent.tools import TIER1_TOOLS, TOOL_MAP
+from src.agent.tools import ALL_TOOLS, TIER1_TOOLS, TIER2_TOOLS, TIER3_TOOLS, TOOL_MAP
 from src.db.loader import init_db
 
 
@@ -27,8 +27,8 @@ def conn():
 
 
 def test_tool_registry_completeness():
-    """Verify all 10 Tier 1 tools are registered with schemas."""
-    expected_tools = {
+    """Verify all Tier 1, 2, and 3 tools are registered with schemas."""
+    expected_tier1 = {
         "query_flight_schedule",
         "query_station_departures",
         "query_station_arrivals",
@@ -40,9 +40,14 @@ def test_tool_registry_completeness():
         "query_expiring_certifications",
         "query_crew_risk_signal",
     }
-    registered = {t.name for t in TIER1_TOOLS}
-    assert registered == expected_tools
-    assert len(TOOL_MAP) == 10
+    assert {t.name for t in TIER1_TOOLS} == expected_tier1
+    assert {t.name for t in TIER2_TOOLS} == {"simulate_disruption_impact"}
+    assert {t.name for t in TIER3_TOOLS} == {
+        "optimize_disruption_recovery",
+        "generate_callout_notification_draft",
+    }
+    assert len(ALL_TOOLS) == 13
+    assert len(TOOL_MAP) == 13
 
 
 def test_graph_compilation():
@@ -135,3 +140,53 @@ def test_tools_node_unknown_tool_handling():
     assert len(result["messages"]) == 1
     err_data = json.loads(result["messages"][0].content)
     assert "error" in err_data
+
+
+def test_tools_node_tier2_and_tier3_execution(conn):
+    """Verify tools_node executes Tier 2 and Tier 3 tools deterministically."""
+    ai_msg = AIMessage(
+        content="",
+        tool_calls=[
+            {
+                "name": "simulate_disruption_impact",
+                "args": {
+                    "event_type": "SICK_CREW",
+                    "date": "2026-09-17",
+                    "crew_id": "C-1042",
+                    "pairing_id": "P-2224",
+                },
+                "id": "call_sim_test",
+            },
+            {
+                "name": "optimize_disruption_recovery",
+                "args": {
+                    "event_type": "SICK_CREW",
+                    "date": "2026-09-17",
+                    "crew_id": "C-1042",
+                    "pairing_id": "P-2224",
+                    "role": "Captain",
+                    "station": "DEL",
+                },
+                "id": "call_opt_test",
+            },
+        ],
+    )
+    state = {
+        "messages": [ai_msg],
+        "tool_results": [],
+        "reasoning_trace": [],
+    }
+    result = tools_node(state)
+    assert len(result["messages"]) == 2
+
+    sim_res = json.loads(result["messages"][0].content)
+    assert sim_res["pairing_id"] == "P-2224"
+    assert any("DX451" in f for f in sim_res["uncovered_flights"])
+
+    opt_res = json.loads(result["messages"][1].content)
+    assert opt_res["expected_choice"]["legal"] is True
+    assert opt_res["expected_choice"]["crew_id"] == "C-3315"
+    assert opt_res["expected_choice"]["cost_inr"] == 18500
+    assert opt_res["expected_choice"]["delay_hours"] == 0.0
+
+
