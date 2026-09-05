@@ -36,7 +36,7 @@ export function ChatComposer({ onSend, disabled = false }) {
           className="h-full w-full bg-transparent pl-9 pr-3 text-sm text-slate-700 outline-none placeholder:text-slate-400 disabled:opacity-60"
         />
       </label>
-      <Button type="submit" disabled={!value.trim() || disabled} className="h-10 shrink-0 rounded-xl bg-emerald-600 px-4 hover:bg-emerald-700">
+      <Button type="submit" disabled={!value.trim() || disabled} className="h-10 shrink-0 rounded-xl px-4">
         Send query
         <Send className="h-3.5 w-3.5" />
       </Button>

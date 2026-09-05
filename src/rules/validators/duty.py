@@ -65,7 +65,7 @@ def check_duty_7d(
             rule_id="RULE-DUTY-02",
             passed=False,
             detail=(
-                f"RULE-DUTY-02: would exceed {DUTY_MAX_HOURS}h/7d by {breach_str} on {window_end_date} (total {total:.2f}h)"
+                f"RULE-DUTY-02: would exceed {DUTY_MAX_HOURS:g}h/7d by {breach_str} on {window_end_date} (total {total:.2f}h)"
             ),
             breach=breach,
         )

@@ -25,7 +25,7 @@ export function QuickPrompts({ onSelect, disabled = false }) {
           size="sm"
           disabled={disabled}
           onClick={() => onSelect(prompt.query)}
-          className="shrink-0 rounded-full text-xs font-medium text-slate-600 hover:border-emerald-300 hover:text-emerald-700"
+          className="shrink-0 rounded-full text-xs font-medium"
         >
           {prompt.label}
         </Button>

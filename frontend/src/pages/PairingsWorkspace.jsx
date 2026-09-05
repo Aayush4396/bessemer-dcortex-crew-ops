@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { FilterBar } from '@/components/pairings/FilterBar'
 import { KpiBar } from '@/components/pairings/KpiBar'
 import { PairingCard } from '@/components/pairings/PairingCard'
+import { PageHeader, PageShell, StatusPanel } from '@/components/layout/PageShell'
 import { usePairings } from '@/hooks/usePairings'
 
 export function PairingsWorkspace() {
@@ -13,13 +14,11 @@ export function PairingsWorkspace() {
   const pairings = useMemo(() => data?.pairings ?? [], [data])
 
   return (
-    <div className="h-full min-h-0 space-y-4 overflow-y-auto p-6">
-      <div>
-        <h1 className="text-lg font-semibold text-slate-900">Tactical Pairings Roster</h1>
-        <p className="text-sm text-slate-500">
-          One row per pairing-day. At-risk crew are expanded; legal complement is collapsed.
-        </p>
-      </div>
+    <PageShell className="space-y-4">
+      <PageHeader
+        title="Tactical Pairings Roster"
+        subtitle="One row per pairing-day. At-risk crew are expanded; legal complement is collapsed."
+      />
 
       <KpiBar kpis={data?.kpis} />
 
@@ -37,22 +36,12 @@ export function PairingsWorkspace() {
         }}
       />
 
-      {isPending && (
-        <div className="rounded-xl border border-dashed border-slate-300 bg-white px-4 py-10 text-center text-sm text-slate-500">
-          Loading pairings from SQLite…
-        </div>
-      )}
+      {isPending && <StatusPanel>Loading pairings from SQLite…</StatusPanel>}
 
-      {isError && (
-        <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-6 text-sm text-rose-700">
-          {error.message}
-        </div>
-      )}
+      {isError && <StatusPanel tone="error">{error.message}</StatusPanel>}
 
       {!isPending && !isError && pairings.length === 0 && (
-        <div className="rounded-xl border border-dashed border-slate-300 bg-white px-4 py-10 text-center text-sm text-slate-500">
-          No pairings match this day, tail, or risk filter.
-        </div>
+        <StatusPanel>No pairings match this day, tail, or risk filter.</StatusPanel>
       )}
 
       <div className="space-y-3">
@@ -60,6 +49,6 @@ export function PairingsWorkspace() {
           <PairingCard key={pairing.pairing_id} pairing={pairing} />
         ))}
       </div>
-    </div>
+    </PageShell>
   )
 }

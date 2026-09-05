@@ -7,6 +7,7 @@ Implements the multi-turn agentic ReAct loop:
 """
 
 import json
+import re
 from typing import Any, Literal
 
 from langchain_core.messages import (
@@ -23,7 +24,30 @@ from src.db.chat_store import get_session_messages, save_message
 from .client import get_llm
 from .prompts import ROUTER_SYSTEM_PROMPT
 from .state import AgentState
-from .tools import TIER1_TOOLS, TOOL_MAP
+from .tool_calls import (
+    all_calls_already_run,
+    desk_text_from_tools,
+    hydrate_tool_calls,
+    message_text,
+    strip_model_scratch,
+    tool_call_signature,
+)
+from .tools import ALL_TOOLS, TOOL_MAP
+
+MAX_TOOL_HOPS = 8
+
+_GREETING_ONLY = re.compile(
+    r"^(hi|hello|hey|thanks|thank you|ok|okay|bye|good morning|good evening)[.!\s]*$",
+    re.IGNORECASE,
+)
+
+
+def is_operational_query(query: str) -> bool:
+    """True when the desk question must hit SQLite (tools or query_database)."""
+    text = (query or "").strip()
+    if not text:
+        return False
+    return _GREETING_ONLY.fullmatch(text) is None
 
 
 # Parameters that represent temporal/query controls rather than persistent operational entities
@@ -128,7 +152,7 @@ def agent_node(state: AgentState) -> dict[str, Any]:
     formulate tool calls, or synthesize final operational responses.
     """
     llm = get_llm(temperature=0.0)
-    model_with_tools = llm.bind_tools(TIER1_TOOLS)
+    model_with_tools = llm.bind_tools(ALL_TOOLS)
 
     # Use compact context pre-processor
     compact_messages = prepare_compact_context(
@@ -136,7 +160,51 @@ def agent_node(state: AgentState) -> dict[str, Any]:
         state.get("active_entities"),
     )
 
-    response: AIMessage = model_with_tools.invoke(compact_messages)
+    response: AIMessage = hydrate_tool_calls(model_with_tools.invoke(compact_messages))
+
+    if (
+        not response.tool_calls
+        and not state.get("tool_results")
+        and is_operational_query(state.get("user_query") or "")
+    ):
+        response = hydrate_tool_calls(
+            model_with_tools.invoke(
+                compact_messages
+                + [
+                    SystemMessage(
+                        content=(
+                            "Airline-operations questions cannot be answered from the "
+                            "system prompt or memory. Call a lookup/check tool or "
+                            "query_database now. Do not write desk prose yet. "
+                            "Do not copy illustration types (B737, Q400, IX, C-99)."
+                        )
+                    )
+                ]
+            )
+        )
+
+    if response.tool_calls and all_calls_already_run(
+        response.tool_calls, state.get("tool_results") or []
+    ):
+        # Keep tools bound: Sarvam 400s if ToolMessages are in the thread without a tools schema.
+        response = hydrate_tool_calls(
+            model_with_tools.invoke(
+                compact_messages
+                + [
+                    SystemMessage(
+                        content=(
+                            "Those rule checks already ran this turn. "
+                            "Write the desk answer from passed/detail/issues. "
+                            "Do not emit tool markup or <think>."
+                        )
+                    )
+                ]
+            )
+        )
+        if response.tool_calls and all_calls_already_run(
+            response.tool_calls, state.get("tool_results") or []
+        ):
+            response = AIMessage(content=strip_model_scratch(message_text(response.content)))
 
     trace = list(state.get("reasoning_trace", []))
     if response.tool_calls:
@@ -149,7 +217,7 @@ def agent_node(state: AgentState) -> dict[str, Any]:
     for tc in (response.tool_calls or []):
         tool_calls_extracted.append({"name": tc["name"], "args": tc["args"], "id": tc["id"]})
 
-    final_text = str(response.content) if response.content else ""
+    final_text = strip_model_scratch(message_text(response.content))
 
     return {
         "messages": [response],
@@ -178,6 +246,26 @@ def tools_node(state: AgentState) -> dict[str, Any]:
 
         # Track active focus entities dynamically for pronoun resolution
         active_entities = extract_active_entities(tool_args, active_entities)
+
+        prior = next(
+            (
+                row
+                for row in tool_results
+                if tool_call_signature(row["tool_name"], row.get("args"))
+                == tool_call_signature(tool_name, tool_args)
+            ),
+            None,
+        )
+        if prior is not None:
+            tool_messages.append(
+                ToolMessage(
+                    content=json.dumps(prior["result"], default=str),
+                    tool_call_id=tool_id,
+                    name=tool_name,
+                )
+            )
+            trace.append(f"Reused {tool_name}({tool_args}) from earlier hop this turn")
+            continue
 
         if tool_name not in TOOL_MAP:
             error_msg = f"Unknown tool requested: {tool_name}"
@@ -213,19 +301,20 @@ def tools_node(state: AgentState) -> dict[str, Any]:
         "tool_results": tool_results,
         "reasoning_trace": trace,
         "active_entities": active_entities,
+        "tool_hops": state.get("tool_hops", 0) + 1,
     }
 
 
 def should_continue(state: AgentState) -> Literal["tools", "__end__"]:
     """
     Conditional routing edge from agent:
-    If tool calls are present and under safety depth limit, transition to tools node;
-    otherwise terminate at END.
+    If tool calls are present and under the hop limit, transition to tools node;
+    otherwise terminate at END. Hops (agent↔tools cycles) are counted, not
+    total tool calls, so one turn can emit several parallel rule checks.
     """
     last_message = state["messages"][-1]
     if hasattr(last_message, "tool_calls") and last_message.tool_calls:
-        # Prevent runaway multi-turn tool loops
-        if len(state.get("tool_calls", [])) < 6:
+        if state.get("tool_hops", 0) < MAX_TOOL_HOPS:
             return "tools"
     return "__end__"
 
@@ -306,19 +395,43 @@ def run_crew_ops_agent(query: str, session_id: str = "default", tier: int = 1) -
         "active_entities": active_entities,
         "tool_calls": [],
         "tool_results": [],
+        "tool_hops": 0,
         "reasoning_trace": [f"Received Controller Query: '{query}'"],
         "final_response": "",
     }
 
     result = app.invoke(initial_state)
 
-    # 3. Find last AI message with non-empty content
-    final_text = result.get("final_response", "")
+    # 3. Desk text: strip scratch, then recover if the model returned only tools/think
+    final_text = strip_model_scratch(message_text(result.get("final_response", "") or ""))
     if not final_text:
         for msg in reversed(result.get("messages", [])):
             if isinstance(msg, AIMessage) and msg.content:
-                final_text = str(msg.content)
-                break
+                cleaned = strip_model_scratch(message_text(msg.content))
+                if cleaned:
+                    final_text = cleaned
+                    break
+
+    tool_results = result.get("tool_results", [])
+    if not final_text and tool_results:
+        forced = get_llm(temperature=0.0).bind_tools(ALL_TOOLS).invoke(
+            prepare_compact_context(
+                result.get("messages", []),
+                result.get("active_entities"),
+            )
+            + [
+                SystemMessage(
+                    content=(
+                        "The tool results are already in this thread. "
+                        "Write the controller-facing desk answer now in plain text. "
+                        "No tool markup, no <think>, no JSON fence."
+                    )
+                )
+            ]
+        )
+        final_text = strip_model_scratch(message_text(getattr(forced, "content", "")))
+    if not final_text and tool_results:
+        final_text = desk_text_from_tools(tool_results)
 
     # 4. Persist completed turn to SQLite
     tool_calls = result.get("tool_calls", [])

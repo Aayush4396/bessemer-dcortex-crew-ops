@@ -5,12 +5,12 @@
   --color-background: #eef1f5;
   --color-card: #ffffff;
   --color-sidebar: #f7f8fa;
-  --color-ink: #111827;
-  --color-muted: #6b7280;
-  --color-line: #e5e7eb;
+  --color-ink: #0f172a;
+  --color-muted: #64748b;
+  --color-line: #e2e8f0;
   --color-critical: #e11d48;
   --color-elevated: #d97706;
-  --color-safe: #16a34a;
+  --color-safe: #059669;
 }
 
 html,
@@ -25,6 +25,7 @@ body {
   color: var(--color-ink);
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
+  color-scheme: light;
 }
 
 ::-webkit-scrollbar {
@@ -35,4 +36,8 @@ body {
 ::-webkit-scrollbar-thumb {
   background: #cbd5e1;
   border-radius: 999px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
 }

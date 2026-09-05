@@ -218,4 +218,22 @@ def get_flight_schedule_stats(
             "block_hours": float(min_b),
             "flights": [r["flight_no"] for r in rows],
         }
+    elif metric == "max_seats":
+        rows = c.execute(
+            """
+            SELECT aircraft_type, MAX(seats) AS max_seats
+            FROM flights
+            GROUP BY aircraft_type
+            ORDER BY max_seats DESC, aircraft_type ASC
+            """
+        ).fetchall()
+        return {
+            "by_type": [
+                {
+                    "aircraft_type": r["aircraft_type"],
+                    "max_seats": int(r["max_seats"]),
+                }
+                for r in rows
+            ]
+        }
     raise ValueError(f"Unknown metric {metric!r}")

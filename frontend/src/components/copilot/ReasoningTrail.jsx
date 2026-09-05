@@ -60,7 +60,7 @@ export function ReasoningTrail({
   reasoningTrace = [],
   toolCalls = [],
   toolResults = [],
-  defaultOpen = true,
+  defaultOpen = false,
 }) {
   const [open, setOpen] = useState(defaultOpen)
   const hasTrail = reasoningTrace.length > 0 || toolCalls.length > 0 || toolResults.length > 0
@@ -79,14 +79,18 @@ export function ReasoningTrail({
           <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-600">
             Reasoning
           </span>
-          <Badge variant="low" className="normal-case tracking-normal">
-            <CheckCircle2 className="mr-1 h-3 w-3" />
-            SQLite · no LLM math
-          </Badge>
-          {toolCalls.length > 0 && (
-            <span className="text-[11px] text-slate-400">
-              {toolCalls.length} tool call{toolCalls.length === 1 ? '' : 's'}
-            </span>
+          {toolCalls.length > 0 ? (
+            <>
+              <Badge variant="low" className="normal-case tracking-normal">
+                <CheckCircle2 className="mr-1 h-3 w-3" />
+                SQLite · no LLM math
+              </Badge>
+              <span className="text-[11px] text-slate-400">
+                {toolCalls.length} tool call{toolCalls.length === 1 ? '' : 's'}
+              </span>
+            </>
+          ) : (
+            <span className="text-[11px] text-slate-400">no tool call</span>
           )}
         </span>
         <ChevronDown className={cn('h-4 w-4 text-slate-400 transition-transform', open && 'rotate-180')} />
