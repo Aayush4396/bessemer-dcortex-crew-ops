@@ -163,14 +163,21 @@ source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
-Create a `.env` file in the project root:
-```env
-SARVAM_API_KEY=your_sarvam_api_key_here
-SARVAM_MODEL=sarvam-105b
-DB_PATH=crew_ops.db
+### ⚡ One-Click Startup (Recommended)
+
+Start both the FastAPI backend (`:8000`) and the React console (`:5173`) with a single command:
+
+```bash
+# On Linux, macOS, WSL, or Git Bash:
+./start.sh
+
+# Or on Windows PowerShell:
+.\start.ps1
 ```
 
-### 2. Initialize SQLite Database
+---
+
+### Manual Step-by-Step Setup
 
 Populate the local `crew_ops.db` file from the dataset JSON files:
 ```bash
