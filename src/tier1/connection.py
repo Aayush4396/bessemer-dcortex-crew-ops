@@ -25,6 +25,10 @@ def get_connection(conn: sqlite3.Connection | None = None) -> sqlite3.Connection
     """
     if conn is not None:
         return conn
+    if not _DEFAULT_DB_PATH.exists():
+        from src.db.loader import init_db
+
+        return init_db(db_path=str(_DEFAULT_DB_PATH))
     c = sqlite3.connect(_DEFAULT_DB_PATH, check_same_thread=False)
     c.row_factory = sqlite3.Row
     return c

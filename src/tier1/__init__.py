@@ -15,6 +15,8 @@ from .flight_queries import (
     get_flights,
 )
 from .risk_queries import get_crew_risk_signal
+from .entity_detail import get_crew_detail, get_flight_detail, list_crew
+from .pairings_workspace import get_pairing, get_pairings_workspace
 from .roster_queries import get_pairing_roster
 
 __all__ = [
@@ -25,6 +27,11 @@ __all__ = [
     "get_crew_profile",
     "get_reserves_at_station",
     "get_pairing_roster",
+    "get_pairings_workspace",
+    "get_pairing",
+    "get_flight_detail",
+    "get_crew_detail",
+    "list_crew",
     "get_crew_duty_balance",
     "get_expiring_certifications",
     "get_crew_risk_signal",

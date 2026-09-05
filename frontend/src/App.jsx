@@ -1,61 +1,33 @@
-import React, { useState, useEffect } from 'react';
-import Navbar from './components/Navbar';
-import Sidebar from './components/Sidebar';
-import ChatConsole from './components/ChatConsole';
-import { Tier2Placeholder, Tier3Placeholder } from './components/TierPlaceholders';
+import { Navigate, Route, Routes } from 'react-router-dom'
+import { AppSidebar } from '@/components/layout/AppSidebar'
+import { usePairings } from '@/hooks/usePairings'
+import { CopilotPage } from '@/pages/CopilotPage'
+import { CrewDetailPage } from '@/pages/CrewDetailPage'
+import { CrewManagementPage } from '@/pages/CrewManagementPage'
+import { FlightDetailPage } from '@/pages/FlightDetailPage'
+import { PairingDetailPage } from '@/pages/PairingDetailPage'
+import { PairingsWorkspace } from '@/pages/PairingsWorkspace'
 
 export default function App() {
-  const [activeTier, setActiveTier] = useState(1);
-  const [stats, setStats] = useState(null);
-  const [backendStatus, setBackendStatus] = useState(false);
-
-  useEffect(() => {
-    // Fetch stats and check backend health
-    const checkBackend = async () => {
-      try {
-        const healthRes = await fetch('/api/health');
-        if (healthRes.ok) {
-          setBackendStatus(true);
-          const statsRes = await fetch('/api/stats');
-          if (statsRes.ok) {
-            const statsData = await statsRes.json();
-            setStats(statsData);
-          }
-        } else {
-          setBackendStatus(false);
-        }
-      } catch (err) {
-        console.warn('Backend server not detected on /api/health:', err);
-        setBackendStatus(false);
-      }
-    };
-
-    checkBackend();
-    const interval = setInterval(checkBackend, 15000);
-    return () => clearInterval(interval);
-  }, []);
+  const { data } = usePairings({ date: '2026-09-15', risk: 'all' })
 
   return (
-    <div className="h-screen w-screen flex flex-col bg-[#070a12] text-slate-100 overflow-hidden select-none">
-      {/* Top Operations Header */}
-      <Navbar stats={stats} backendStatus={backendStatus} />
-
-      {/* Main Operations Body */}
-      <div className="flex-1 flex overflow-hidden">
-        {/* Left Workflow Switcher & Fleet Stats Sidebar */}
-        <Sidebar 
-          activeTier={activeTier} 
-          setActiveTier={setActiveTier} 
-          stats={stats} 
-        />
-
-        {/* Dynamic Workflow Area */}
-        <main className="flex-1 flex overflow-hidden bg-slate-950/20">
-          {activeTier === 1 && <ChatConsole />}
-          {activeTier === 2 && <Tier2Placeholder onSwitchToTier1={() => setActiveTier(1)} />}
-          {activeTier === 3 && <Tier3Placeholder onSwitchToTier1={() => setActiveTier(1)} />}
-        </main>
-      </div>
+    <div className="flex h-full min-h-0 bg-[#eef1f5]">
+      <AppSidebar
+        pairingCount={data?.kpis?.active_pairings ?? 0}
+        crewCount={data?.kpis?.crew_complement ?? 0}
+      />
+      <main className="min-h-0 min-w-0 flex-1 overflow-hidden">
+        <Routes>
+          <Route path="/" element={<PairingsWorkspace />} />
+          <Route path="/pairings/:pairingId" element={<PairingDetailPage />} />
+          <Route path="/flights/:flightId" element={<FlightDetailPage />} />
+          <Route path="/crew" element={<CrewManagementPage />} />
+          <Route path="/crew/:crewId" element={<CrewDetailPage />} />
+          <Route path="/copilot" element={<CopilotPage />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </main>
     </div>
-  );
+  )
 }
