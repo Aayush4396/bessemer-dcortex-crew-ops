@@ -60,13 +60,118 @@ flowchart TD
 
 ---
 
-## 3. SQLite Schema & Optimization (`src/db/schema.sql`)
+## 3. SQLite Relational Schema & ERD (`src/db/schema.sql`)
 
 The database uses SQLite 3 with performance and concurrency pragmas:
 
 ```sql
 PRAGMA journal_mode = WAL;
 PRAGMA foreign_keys = ON;
+```
+
+### Entity-Relationship Diagram (ERD)
+
+```mermaid
+erDiagram
+    crew ||--o{ pairing_crew : "assigned to"
+    pairings ||--o{ pairing_crew : "staffed by"
+    crew ||--o{ duty_clocks : "has snapshot"
+    crew ||--o{ duty_clock_history : "accrues daily"
+    crew ||--o{ reserve_pool : "scheduled standby"
+    crew ||--o{ certifications : "holds"
+    crew ||--o{ risk_signals : "evaluated for"
+    chat_sessions ||--o{ chat_messages : "contains turns"
+
+    crew {
+        string crew_id PK
+        string name
+        string rank
+        string base
+        string ratings
+        string status
+        int reachability_minutes
+    }
+
+    flights {
+        string flight_id PK
+        string flight_no
+        string date
+        string dep_station
+        string arr_station
+        string dep_utc
+        string arr_utc
+        float block_hours
+        string aircraft
+        string aircraft_type
+        int seats
+    }
+
+    pairings {
+        int id PK
+        string pairing_id
+        string aircraft
+        string date
+        string report_utc
+        string release_utc
+        string flights_json
+    }
+
+    pairing_crew {
+        string pairing_id PK
+        string crew_id PK
+        string role
+    }
+
+    duty_clock_history {
+        string crew_id PK
+        string date PK
+        float duty_hours
+        float flight_hours
+    }
+
+    reserve_pool {
+        int id PK
+        string crew_id FK
+        string base
+        string date
+        string on_call_start
+        string on_call_end
+    }
+
+    certifications {
+        int id PK
+        string crew_id FK
+        string cert_type
+        string valid_from
+        string valid_to
+    }
+
+    risk_signals {
+        string crew_id PK
+        string as_of_utc
+        float disruption_risk_score
+        string drivers_json
+    }
+
+    chat_sessions {
+        string session_id PK
+        string title
+        int tier
+        string created_at
+        string updated_at
+    }
+
+    chat_messages {
+        string message_id PK
+        string session_id FK
+        string sender
+        string content
+        int tier_used
+        string tool_calls
+        string tool_results
+        string reasoning_trace
+        string created_at
+    }
 ```
 
 ### Key Indices for Sub-Millisecond Queries:

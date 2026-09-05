@@ -104,6 +104,27 @@ When evaluating a multi-day pairing (e.g. Day 1: BLR $\to$ DEL with overnight la
 - Duty and flight hours accumulated on Day 1 are passed into Day 2's 7-day and 28-day rolling window checks.
 - On Day 2+, the departure station is automatically recognized as the layover station rather than requiring an erroneous cross-base deadhead flag.
 
+```mermaid
+sequenceDiagram
+    autonumber
+    participant Engine as Legality Engine
+    participant Day1 as Day 1 Evaluation
+    participant Rest as Overnight Rest Check
+    participant Day2 as Day 2 Evaluation
+
+    Engine->>Day1: Evaluate Day 1 (Report 06:00Z -> Release 14:00Z)
+    Day1-->>Engine: FDP: 8h, Block: 5.5h (Legal)
+    
+    Engine->>Rest: Verify Rest Gap (Release Day 1 -> Report Day 2)
+    Note over Rest: 14:00Z (Day 1) to 05:00Z (Day 2) = 15h Rest >= 12h
+    Rest-->>Engine: RULE-REST-04 Passed
+    
+    Engine->>Day2: Evaluate Day 2 with Day 1 Hours Accumulated
+    Note over Day2: Rolling 7d Duty = Historical + Day 1 (8h) + Day 2 (7h) <= 60h
+    Note over Day2: Dep Station = DEL (Overnight Layover, No Deadhead)
+    Day2-->>Engine: All Rules Passed (Legal Multi-Day Rotation)
+```
+
 ---
 
 ## 5. Public Python API

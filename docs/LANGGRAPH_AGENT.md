@@ -71,8 +71,42 @@ flowchart LR
    ```
 3. **Coreference & Pronoun Resolution:**
    Enables seamless multi-turn inquiries:
-   - Turn 1: *"Who operates DX412?"*
+   - Turn 1: *"Who operates DX412 on 2026-09-15?"*
    - Turn 2: *"What is his 7-day duty balance?"* $\to$ Automatically targets `C-1042`.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Controller as Crew Controller
+    participant PreProc as Option A Pre-Processor
+    participant Agent as Sarvam-105B Reasoning Node
+    participant Tools as Deterministic Tools Node
+    participant DB as SQLite (crew_ops.db)
+
+    Note over Controller,DB: Turn 1: Initial Operational Question
+    Controller->>Agent: "Who is the Captain on DX412 on 2026-09-15?"
+    Agent->>Tools: tool_call: query_flight_schedule(date='2026-09-15', flight_no='DX412')
+    Tools->>DB: SELECT flights & pairings
+    DB-->>Tools: Returns flight + Captain A. Nair (C-1042)
+    Note over Tools: extract_active_entities captures: {flight_no: 'DX412', crew_id: 'C-1042'}
+    Tools-->>Agent: ToolMessage payload
+    Agent-->>Controller: "Captain on DX412 is Captain A. Nair (C-1042)..."
+    Agent->>DB: save_message(Turn 1 user + assistant + tools)
+
+    Note over Controller,DB: Turn 2: Follow-Up Inquiry with Pronoun
+    Controller->>PreProc: "What is his 7-day duty balance?"
+    PreProc->>DB: Load session history
+    PreProc->>PreProc: Prune Turn 1 JSON payload to stub
+    PreProc->>PreProc: Inject [Active Operational Context]: crew_id: C-1042
+    PreProc->>Agent: Compacted Context (~400 tokens)
+    Note over Agent: Resolves "his" -> C-1042 from injected registry
+    Agent->>Tools: tool_call: query_crew_duty_balance(crew_id='C-1042', as_of_date='2026-09-14')
+    Tools->>DB: Calculate 7-day rolling duty sum
+    DB-->>Tools: 20.93h accrued, 39.07h headroom
+    Tools-->>Agent: ToolMessage payload
+    Agent-->>Controller: "Captain A. Nair has accrued 20.93h (39.07h headroom against 60h cap)..."
+    Agent->>DB: save_message(Turn 2 user + assistant + tools)
+```
 
 ---
 

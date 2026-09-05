@@ -70,6 +70,20 @@ Evaluating a pilot's 7-day duty hours must account for two distinct periods:
 1. **Historical Records ($\le$ Snapshot Date):** Read from `duty_clock_history` (4,200 rows in SQLite).
 2. **Planned Roster Duties ($>$ Snapshot Date):** Dynamically aggregated from published `pairings` table rows.
 
+```mermaid
+flowchart TD
+    Req["Query Duty Balance\n(crew_id='C-1042', as_of_date='2026-09-14')"] --> Split{"Split by Snapshot Date\n(2026-09-14)"}
+    
+    Split -->|Date <= 2026-09-14| Hist["duty_clock_history Table\n(Sum daily records over window)"]
+    Split -->|Date > 2026-09-14| Plan["pairings + pairing_crew Tables\n(Sum scheduled report to release hours)"]
+    
+    Hist --> Sum["Accrued Total Duty: 20.93h"]
+    Plan --> Sum
+    
+    Sum --> Math["DGCA RULE-DUTY-02 Cap = 60.0h\nHeadroom = 60.0h - 20.93h"]
+    Math --> Res["Return: {duty_hours_7d: 20.93, headroom_hours: 39.07}"]
+```
+
 ```python
 # Rolling 7-day calculation
 duty_7d = round(
@@ -85,6 +99,19 @@ Handles three distinct inquiry patterns:
 1. **By `crew_id`:** Returns all pairings, report/release times, and ordered flight legs assigned to that pilot.
 2. **By `pairing_id`:** Returns all assigned crew members and their operational roles (`Captain`, `First Officer`, `Senior Cabin Crew`, `Cabin Crew`).
 3. **By `aircraft` & `date` & `role`:** Returns the specific crew member operating an aircraft (e.g. *Who is Senior Cabin Crew on VT-DXB on Sep 16?* $\to$ `C-4809`).
+
+```mermaid
+flowchart LR
+    Caller["get_pairing_roster()"] --> FilterCheck{"Parameter Filter"}
+    
+    FilterCheck -->|crew_id Provided| Reverse["Reverse Lookup:\npairing_crew JOIN pairings\n(Find all flights assigned to pilot)"]
+    FilterCheck -->|pairing_id Provided| FwdPairing["Forward Lookup by Pairing:\npairing_crew\n(Return all crew + ranks on pairing)"]
+    FilterCheck -->|aircraft + date + role| FwdTail["Tail Lookup:\npairings JOIN pairing_crew\n(Return specific officer on aircraft tail)"]
+    
+    Reverse --> ResRev["Output: List of pairings, dates, UTC report/release, flight legs"]
+    FwdPairing --> ResFwd["Output: List of {crew_id, role}"]
+    FwdTail --> ResTail["Output: Specific crew_id (e.g. C-4809)"]
+```
 
 ---
 

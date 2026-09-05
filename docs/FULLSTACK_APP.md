@@ -43,6 +43,40 @@ flowchart TD
     Agent <--> DB
 ```
 
+### End-to-End Operational Interaction Sequence
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Controller as Crew Controller
+    participant React as React Console (Port 5173)
+    participant API as FastAPI Backend (Port 8000)
+    participant Agent as LangGraph Agent (Sarvam-105B)
+    participant DB as SQLite (crew_ops.db)
+
+    Controller->>React: Click "+ New Inquiry Session"
+    React->>API: POST /api/sessions {"title": "New Operational Inquiry"}
+    API->>DB: INSERT INTO chat_sessions (sess_xxx)
+    DB-->>API: Created
+    API-->>React: {"session_id": "sess_xxx", "title": "New Operational Inquiry"}
+    React->>React: Set activeSessionId, cache in localStorage
+
+    Controller->>React: Submit Query ("Who is on reserve at BLR on Sep 15?")
+    React->>React: Optimistic UI: render user message, show spinner
+    React->>API: POST /api/chat {"query": "...", "session_id": "sess_xxx", "tier": 1}
+    API->>Agent: run_crew_ops_agent(query, session_id="sess_xxx", tier=1)
+    Agent->>DB: Load prior session turns & execute query_reserve_crew()
+    DB-->>Agent: Returns 12 reserve crew records
+    Agent->>Agent: Synthesize markdown response with table & audit trace
+    Agent->>DB: save_message(user prompt) & save_message(assistant response)
+    Note over DB: chat_sessions title auto-updated to query snippet
+    Agent-->>API: Result {response, tool_calls, tool_results, reasoning_trace}
+    API-->>React: 200 OK JSON
+    React->>React: Render assistant bubble + expandable AuditDrawer
+    React->>API: GET /api/sessions (Refresh sidebar count & title)
+    API-->>React: Updated sessions list
+```
+
 ---
 
 ## 2. FastAPI Backend Layer ([src/api/server.py](file:///c:/Users/aayus/OneDrive/Desktop/bessemer_dcortex/src/api/server.py))
