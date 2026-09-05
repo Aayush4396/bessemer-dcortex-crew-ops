@@ -11,12 +11,10 @@ Welcome to the technical documentation repository for the **dCortex & Bessemer T
 | **1** | **[Database Pipeline & Ingestion](file:///c:/Users/aayus/OneDrive/Desktop/bessemer_dcortex/docs/DATABASE_PIPELINE.md)** | `src/db/` | 11-table normalized SQLite schema, raw JSON ETL loader, WAL mode concurrency pragmas, and session store. |
 | **2** | **[DGCA CAR Legality Rules Engine](file:///c:/Users/aayus/OneDrive/Desktop/bessemer_dcortex/docs/RULES_ENGINE.md)** | `src/rules/` | Deterministic compliance engine for DGCA CAR Sec 7 Ser J: Table A/B FDP caps, 7d/28d rolling windows, 12h rest, ratings, certs, and base geometry. |
 | **3** | **[Tier 1 Operational Query Engine](file:///c:/Users/aayus/OneDrive/Desktop/bessemer_dcortex/docs/TIER1_QUERY_ENGINE.md)** | `src/tier1/` | Domain-driven queries for flight schedules, crew profiles, standby reserve pools, duty balances, and Q01–Q16 ground-truth benchmarks. |
-| **4** | **[Tier 2 Disruption Simulator](file:///c:/Users/aayus/OneDrive/Desktop/bessemer_dcortex/docs/TIER2_DISRUPTION_SIMULATOR.md)** | `src/tier2/` | Cascading disruption simulator: sick crew, station closures (BLR fog), rotational technical delays (VT-DXA), cert expiries, and multi-sick cascades. |
-| **5** | **[Tier 3 Recovery Optimizer](file:///c:/Users/aayus/OneDrive/Desktop/bessemer_dcortex/docs/TIER3_RECOVERY_OPTIMIZER.md)** | `src/tier3/` | Multi-variable recovery engine: candidate discovery across reserves and day-offs, legality pre-filter, exact INR costing, combinatorial joint solver, and dispatch callout drafter. |
-| **6** | **[Pairings Workspace & Entity 360](file:///c:/Users/aayus/OneDrive/Desktop/bessemer_dcortex/docs/PAIRINGS_WORKSPACE_AND_ENTITIES.md)** | `src/tier1/` & UI | Tactical pairing roster engine, network KPI calculations, composite risk models (`low` to `critical`), multi-day rotation grouping, and Flight/Crew 360 profiles. |
-| **7** | **[LangGraph Agent & Memory](file:///c:/Users/aayus/OneDrive/Desktop/bessemer_dcortex/docs/LANGGRAPH_AGENT.md)** | `src/agent/` | StateGraph ReAct loop powered by Sarvam-105B, 13 bound operational tools across all 3 tiers, Option A deterministic payload compaction, and multi-turn pronoun resolution. |
-| **8** | **[Full-Stack App: API & Console](file:///c:/Users/aayus/OneDrive/Desktop/bessemer_dcortex/docs/FULLSTACK_APP.md)** | `src/api/` & `frontend/` | FastAPI REST service (active `/api/simulate` and `/api/recover` endpoints), React 19 Operations Desk with React Router, session history, and explainability audit drawers. |
-| **9** | **[Benchmark Matrix & Evaluation](file:///c:/Users/aayus/OneDrive/Desktop/bessemer_dcortex/docs/BENCHMARK_AND_EVALUATION.md)** | `tests/` & root | Complete test suite catalog (92 core automated tests), Q01–Q38 ground truth matrix, S1–S6 scenario validation, and standalone CLI evaluators. |
+| **4** | **[Pairings Workspace & Entity 360](file:///c:/Users/aayus/OneDrive/Desktop/bessemer_dcortex/docs/PAIRINGS_WORKSPACE_AND_ENTITIES.md)** | `src/tier1/` & UI | Tactical pairing roster engine, network KPI calculations, composite risk models (`low` to `critical`), multi-day rotation grouping, and Flight/Crew 360 profiles. |
+| **5** | **[LangGraph Agent & Memory](file:///c:/Users/aayus/OneDrive/Desktop/bessemer_dcortex/docs/LANGGRAPH_AGENT.md)** | `src/agent/` | StateGraph ReAct loop powered by Sarvam-105B, bound lookup and rule-check tools, Option A deterministic payload compaction, and multi-turn pronoun resolution. |
+| **6** | **[Full-Stack App: API & Console](file:///c:/Users/aayus/OneDrive/Desktop/bessemer_dcortex/docs/FULLSTACK_APP.md)** | `src/api/` & `frontend/` | FastAPI REST service, React 19 Operations Desk with React Router, session history, and explainability audit drawers. |
+| **7** | **[Benchmark Matrix & Evaluation](file:///c:/Users/aayus/OneDrive/Desktop/bessemer_dcortex/docs/BENCHMARK_AND_EVALUATION.md)** | `tests/` & root | Test suite catalog, Q01–Q38 ground truth matrix, and standalone CLI evaluators. |
 
 ---
 
@@ -78,16 +76,4 @@ Welcome to the technical documentation repository for the **dCortex & Bessemer T
 ### 2. Verify Complete Automated Test Suite
 ```powershell
 # Run all 92 automated core tests
-.venv\Scripts\pytest.exe tests/test_api.py tests/test_entity_detail.py tests/test_pairings_workspace.py tests/test_router.py tests/test_rules.py tests/test_tier1.py tests/test_tier2.py tests/test_tier3.py -v
-```
-
-Output:
-- `tests/test_api.py`: **10/10 PASSED**
-- `tests/test_entity_detail.py`: **11/11 PASSED**
-- `tests/test_pairings_workspace.py`: **20/20 PASSED**
-- `tests/test_router.py`: **6/6 PASSED**
-- `tests/test_rules.py`: **10/10 PASSED**
-- `tests/test_tier1.py`: **16/16 PASSED**
-- `tests/test_tier2.py`: **11/11 PASSED**
-- `tests/test_tier3.py`: **8/8 PASSED**
-- **Total: 92 passed in 9.40s**
+.venv\Scripts\pytest.exe tests/test_api.py tests/test_entity_detail.py tests/test_pairings_workspace.py tests/test_router.py tests/test_rules.py tests/test_tier1.py tests/test_tier2.py -v

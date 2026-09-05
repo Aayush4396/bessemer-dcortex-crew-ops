@@ -120,10 +120,8 @@ All crew operations adhere to Indian DGCA regulations implemented in [`src/rules
 │   ├── DATABASE_PIPELINE.md            # SQLite schema, normalization, WAL mode
 │   ├── RULES_ENGINE.md                 # Deterministic CAR legality rules engine
 │   ├── TIER1_QUERY_ENGINE.md           # Operational query engine & Q01–Q16 benchmarks
-│   ├── TIER2_DISRUPTION_SIMULATOR.md   # Disruption consequence simulator & S1–S6 scenarios
-│   ├── TIER3_RECOVERY_OPTIMIZER.md     # Recovery candidate ranker & INR cost optimization
 │   ├── PAIRINGS_WORKSPACE_AND_ENTITIES.md # Tactical pairings workspace & Entity 360
-│   ├── LANGGRAPH_AGENT.md              # ReAct agent loop, 13 tools, context compaction
+│   ├── LANGGRAPH_AGENT.md              # ReAct agent loop, tools, context compaction
 │   ├── FULLSTACK_APP.md                # FastAPI REST endpoints & React 19 console
 │   └── BENCHMARK_AND_EVALUATION.md     # Test suite catalog & benchmark question matrix
 ├── frontend/                           # React 19 + Vite + Tailwind CSS Operations Desk
@@ -141,9 +139,9 @@ All crew operations adhere to Indian DGCA regulations implemented in [`src/rules
 │   │   ├── graph.py                    # StateGraph cyclic workflow (agent <-> tools)
 │   │   ├── prompts.py                  # Operational system prompts
 │   │   ├── state.py                    # AgentState definitions
-│   │   └── tools.py                    # 13 LangChain tool wrappers across all tiers
+│   │   └── tools.py                    # LangChain tool wrappers for lookups and rule checks
 │   ├── api/                            # FastAPI Backend Server
-│   │   └── server.py                   # REST endpoints (/api/pairings, /api/chat, /api/simulate, etc.)
+│   │   └── server.py                   # REST endpoints (/api/pairings, /api/chat, /api/sessions)
 │   ├── db/                             # Data Layer & SQLite Loader
 │   │   ├── schema.sql                  # 11-table normalized relational schema
 │   │   ├── loader.py                   # Idempotent JSON -> SQLite database loader
@@ -166,22 +164,18 @@ All crew operations adhere to Indian DGCA regulations implemented in [`src/rules
 │   │   ├── risk_queries.py             # Fatigue scores and driver tags
 │   │   ├── pairings_workspace.py       # Tactical pairing roster, risk scoring, KPIs
 │   │   └── entity_detail.py            # Flight 360 and Crew 360 profile handlers
-│   ├── tier2/                          # Disruption Consequence Simulator
-│   │   ├── models.py                   # Pydantic schemas for disruption impacts
-│   │   └── simulator.py                # Sick crew, station closures, delays, cert expiries
-│   └── tier3/                          # Recovery Optimizer & Candidate Ranker
-│       ├── costs.py                    # Dynamic INR financial rate evaluations
-│       ├── models.py                   # Schemas for recovery options and joint plans
-│       └── optimizer.py                # Candidate ranking, legality check, joint solver, callout
-├── tests/                              # Pytest Automated Test Suite (92 Core Tests Passing)
-│   ├── test_api.py                     # FastAPI REST endpoint integration tests (10 tests)
-│   ├── test_entity_detail.py           # Flight and Crew 360 detail tests (11 tests)
-│   ├── test_pairings_workspace.py      # Tactical pairings workspace & KPI tests (20 tests)
-│   ├── test_router.py                  # LangGraph routing & 13-tool execution tests (6 tests)
-│   ├── test_rules.py                   # CAR legality rules unit tests (10 tests)
-│   ├── test_tier1.py                   # Deterministic queries verification Q01–Q16 (16 tests)
-│   ├── test_tier2.py                   # Disruption simulation S1–S6 & H1 tests (11 tests)
-│   └── test_tier3.py                   # Recovery optimizer & callout drafting tests (8 tests)
+│   └── tier2/                          # Entity lookups and per-rule legality checks
+│       ├── entities.py                 # Pairing, crew, flight-duty, station, cost joins
+│       ├── rules.py                    # FDP, duty, rest, cover, cert, and base checks
+│       └── sql.py                      # Read-only SQLite query_database guard
+├── tests/                              # Pytest Automated Test Suite
+│   ├── test_api.py                     # FastAPI REST endpoint integration tests
+│   ├── test_entity_detail.py           # Flight and Crew 360 detail tests
+│   ├── test_pairings_workspace.py      # Tactical pairings workspace & KPI tests
+│   ├── test_router.py                  # LangGraph routing & tool execution tests
+│   ├── test_rules.py                   # CAR legality rules unit tests
+│   ├── test_tier1.py                   # Deterministic queries verification Q01–Q16
+│   └── test_tier2.py                   # Rule-check handlers for Q17–Q30
 ├── evaluate_tier1.py                   # Standalone CLI Tier 1 benchmark runner
 ├── validate.py                         # Independent dataset integrity validator
 ├── requirements.txt                    # Python dependencies
@@ -230,21 +224,20 @@ Start both the FastAPI backend (`:8000`) and the React console (`:5173`) with a 
 
 ## 🧪 Automated Testing
 
-Run the full core test suite across rules, query handlers, disruption simulators, recovery optimizers, router, and API endpoints:
+Run the core test suite across rules, query handlers, router, and API endpoints:
 
 ```bash
-pytest tests/test_api.py tests/test_entity_detail.py tests/test_pairings_workspace.py tests/test_router.py tests/test_rules.py tests/test_tier1.py tests/test_tier2.py tests/test_tier3.py -v
+pytest tests/test_api.py tests/test_entity_detail.py tests/test_pairings_workspace.py tests/test_router.py tests/test_rules.py tests/test_tier1.py tests/test_tier2.py -v
 ```
 
-### Test Suite Summary (92 / 92 Core Tests Passing)
-- **`test_api.py`** (10 tests): Verifies REST endpoints `/api/health`, `/api/stats`, `/api/chat`, session lifecycle, active `/api/simulate`, and active `/api/recover`.
-- **`test_entity_detail.py`** (11 tests): Verifies Flight 360, Crew 360, 150-crew directory, and 404 handling.
-- **`test_pairings_workspace.py`** (20 tests): Verifies workspace KPIs, 2-day rotation grouping, risk models, and risk band filters.
-- **`test_router.py`** (6 tests): Verifies 13-tool registry mapping, StateGraph compilation, and multi-tier tool execution in `tools_node`.
-- **`test_rules.py`** (10 tests): Validates FDP Table A & B bounds, night duty caps, 7d/28d cumulative duty limits, base vs outstation rest, weekly rest, and base geometry.
-- **`test_tier1.py`** (16 tests): Validates deterministic query handlers against benchmark questions Q01–Q16.
-- **`test_tier2.py`** (11 tests): Validates disruption consequence simulator against Scenarios S1–S6, airport closures, and delay spectra.
-- **`test_tier3.py`** (8 tests): Validates recovery optimizer, candidate ranking, INR costing, joint multi-sick optimization, and Q36 callout alert drafting.
+### Test Suite Summary
+- **`test_api.py`**: REST endpoints `/api/health`, `/api/stats`, `/api/chat`, and session lifecycle.
+- **`test_entity_detail.py`**: Flight 360, Crew 360, 150-crew directory, and 404 handling.
+- **`test_pairings_workspace.py`**: Workspace KPIs, 2-day rotation grouping, and risk filters.
+- **`test_router.py`**: Tool registry, StateGraph compilation, and `tools_node` execution.
+- **`test_rules.py`**: FDP, duty, rest, ratings, certs, and base geometry.
+- **`test_tier1.py`**: Deterministic query handlers against Q01–Q16.
+- **`test_tier2.py`**: Rule-check handlers against Q17–Q30.
 
 ---
 

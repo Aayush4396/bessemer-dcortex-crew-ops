@@ -4,11 +4,9 @@ import { usePairings } from '@/hooks/usePairings'
 import { CopilotPage } from '@/pages/CopilotPage'
 import { CrewDetailPage } from '@/pages/CrewDetailPage'
 import { CrewManagementPage } from '@/pages/CrewManagementPage'
-import { DisruptionSimulatorPage } from '@/pages/DisruptionSimulatorPage'
 import { FlightDetailPage } from '@/pages/FlightDetailPage'
 import { PairingDetailPage } from '@/pages/PairingDetailPage'
 import { PairingsWorkspace } from '@/pages/PairingsWorkspace'
-import { RecoveryOptimizerPage } from '@/pages/RecoveryOptimizerPage'
 
 export default function App() {
   const { data } = usePairings({ date: '2026-09-15', risk: 'all' })
@@ -27,8 +25,6 @@ export default function App() {
           <Route path="/crew" element={<CrewManagementPage />} />
           <Route path="/crew/:crewId" element={<CrewDetailPage />} />
           <Route path="/copilot" element={<CopilotPage />} />
-          <Route path="/simulator" element={<DisruptionSimulatorPage />} />
-          <Route path="/recovery" element={<RecoveryOptimizerPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </main>

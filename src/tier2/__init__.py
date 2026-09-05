@@ -1,7 +1,7 @@
 """
 src/tier2
 =========
-Deterministic disruption simulation plus entity lookups and per-rule legality checks.
+Deterministic Tier 2 entity lookups and per-rule legality checks.
 """
 
 from .entities import (
@@ -24,13 +24,6 @@ from .rules import (
     evaluate_reserve_callout,
     evaluate_rest,
 )
-from .simulator import (
-    simulate_cert_expiry,
-    simulate_disruption,
-    simulate_flight_delay,
-    simulate_sick_crew,
-    simulate_station_closure,
-)
 from .sql import execute_readonly_sql
 
 __all__ = [
@@ -51,9 +44,4 @@ __all__ = [
     "evaluate_cover",
     "evaluate_cover_candidates",
     "execute_readonly_sql",
-    "simulate_disruption",
-    "simulate_sick_crew",
-    "simulate_station_closure",
-    "simulate_flight_delay",
-    "simulate_cert_expiry",
 ]

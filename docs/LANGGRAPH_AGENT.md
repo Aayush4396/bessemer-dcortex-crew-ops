@@ -26,14 +26,9 @@ flowchart TD
 1. **Tier 1 Lookup**: *"Who is the Captain on DX412 on 2026-09-15, and what is his 7-day duty balance?"*
    - Turn 1: Dispatches `query_flight_schedule(date='2026-09-15', flight_no='DX412')` $\to$ resolves Captain `C-1042`.
    - Turn 2: Dispatches `query_crew_duty_balance(crew_id='C-1042', as_of_date='2026-09-14')` $\to$ computes rolling duty hours.
-2. **Tier 2 Disruption Simulation**: *"What is the impact if Captain C-3231 calls in sick for pairing P-2224?"*
-   - Dispatches `simulate_disruption_impact(event_type='SICK_CREW', crew_id='C-3231', pairing_id='P-2224')`.
-   - Returns 4 uncovered flight legs and 288 passenger seats at risk on ATR72.
-3. **Tier 3 Recovery Optimization**: *"What is the cheapest legal way to cover P-2224?"*
-   - Dispatches `optimize_disruption_recovery(event_type='SICK_CREW', crew_id='C-3231', pairing_id='P-2224', role='Captain')`.
-   - Evaluates reserves against CAR rules, returning reserve Captain `C-3315` at ₹18,500.
-4. **Official Callout Alert**: *"Draft the callout notification for C-3310 covering P-2291."*
-   - Dispatches `generate_callout_notification_draft(crew_id='C-3310', pairing_id='P-2291')`.
+2. **Tier 2 Rule Check**: *"Who can legally cover pairing P-2291 for Captain C-1042?"*
+   - Dispatches `check_cover(pairing_id='P-2291', replace_crew_id='C-1042')`.
+   - Returns `legal[]` and `excluded[].issues` from the rule engine.
 
 ---
 
@@ -109,19 +104,11 @@ All 13 deterministic operational tools in [`src/agent/tools.py`](file:///c:/User
 | `query_expiring_certifications`| `as_of_date`, `days_ahead`, `cert_type`, `crew_id` | `src.tier1.get_expiring_certifications` |
 | `query_crew_risk_signal` | `crew_id`, `min_score` | `src.tier1.get_crew_risk_signal` |
 
-### Tier 2 Disruption Simulation Tools (`TIER2_TOOLS` — 1 Tool)
-| Tool Name | Parameters | Target Handler |
-|:---|:---|:---|
-| `simulate_disruption_impact` | `event_type`, `crew_id`, `pairing_id`, `station`, `start_utc`, `end_utc`, `aircraft`, `date`, `delay_hours`, `delay_minutes` | `src.tier2.simulate_disruption` |
-
-### Tier 3 Recovery Optimization Tools (`TIER3_TOOLS` — 2 Tools)
-| Tool Name | Parameters | Target Handler |
-|:---|:---|:---|
-| `optimize_disruption_recovery`| `event_type`, `crew_id`, `pairing_id`, `role`, `station`, `aircraft`, `date`, `delay_hours` | `src.tier3.optimize_recovery` |
-| `generate_callout_notification_draft` | `crew_id`, `pairing_id` | `src.tier3.generate_callout_notification` |
+### Tier 2 Rule-Check Tools (`TIER2_TOOLS`)
+Lookups and legality checks: `query_pairing`, `query_crew_detail`, `query_flight_duty_times`, `query_station_movements`, `query_database`, `query_cost_rates`, `check_fdp_limit`, `check_duty_7d`, `check_flight_28d`, `check_rest`, `check_qualification`, `check_certifications`, `check_base_positioning`, `check_cover`.
 
 ```python
-ALL_TOOLS = TIER1_TOOLS + TIER2_TOOLS + TIER3_TOOLS  # Exactly 13 tools
+ALL_TOOLS = TIER1_TOOLS + TIER2_TOOLS
 TOOL_MAP = {t.name: t for t in ALL_TOOLS}
 ```
 

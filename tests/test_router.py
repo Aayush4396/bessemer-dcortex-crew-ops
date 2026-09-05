@@ -29,7 +29,7 @@ from src.agent.tool_calls import (
     parse_sarvam_tool_markup,
     strip_model_scratch,
 )
-from src.agent.tools import ALL_TOOLS, TIER1_TOOLS, TIER2_TOOLS, TIER3_TOOLS, TOOL_MAP
+from src.agent.tools import ALL_TOOLS, TIER1_TOOLS, TIER2_TOOLS, TOOL_MAP
 from src.db.loader import init_db
 
 
@@ -56,7 +56,6 @@ def test_tool_registry_completeness():
     registered = {t.name for t in TIER1_TOOLS}
     assert registered == expected_tools
     tier2_names = {
-        "simulate_disruption_impact",
         "query_flight_duty_times",
         "query_pairing",
         "query_crew_detail",
@@ -73,10 +72,6 @@ def test_tool_registry_completeness():
         "check_cover",
     }
     assert {t.name for t in TIER2_TOOLS} == tier2_names
-    assert {t.name for t in TIER3_TOOLS} == {
-        "optimize_disruption_recovery",
-        "generate_callout_notification_draft",
-    }
     assert len(TOOL_MAP) == len(ALL_TOOLS)
     assert set(TOOL_MAP) == {t.name for t in ALL_TOOLS}
 
@@ -313,51 +308,3 @@ def test_tools_node_unknown_tool_handling():
     assert len(result["messages"]) == 1
     err_data = json.loads(result["messages"][0].content)
     assert "error" in err_data
-
-
-def test_tools_node_tier2_and_tier3_execution(conn):
-    """Verify tools_node executes Tier 2 and Tier 3 tools deterministically."""
-    ai_msg = AIMessage(
-        content="",
-        tool_calls=[
-            {
-                "name": "simulate_disruption_impact",
-                "args": {
-                    "event_type": "SICK_CREW",
-                    "date": "2026-09-17",
-                    "crew_id": "C-1042",
-                    "pairing_id": "P-2224",
-                },
-                "id": "call_sim_test",
-            },
-            {
-                "name": "optimize_disruption_recovery",
-                "args": {
-                    "event_type": "SICK_CREW",
-                    "date": "2026-09-17",
-                    "crew_id": "C-1042",
-                    "pairing_id": "P-2224",
-                    "role": "Captain",
-                    "station": "DEL",
-                },
-                "id": "call_opt_test",
-            },
-        ],
-    )
-    state = {
-        "messages": [ai_msg],
-        "tool_results": [],
-        "reasoning_trace": [],
-    }
-    result = tools_node(state)
-    assert len(result["messages"]) == 2
-
-    sim_res = json.loads(result["messages"][0].content)
-    assert sim_res["pairing_id"] == "P-2224"
-    assert any("DX451" in f for f in sim_res["uncovered_flights"])
-
-    opt_res = json.loads(result["messages"][1].content)
-    assert opt_res["expected_choice"]["legal"] is True
-    assert opt_res["expected_choice"]["crew_id"] == "C-3315"
-    assert opt_res["expected_choice"]["cost_inr"] == 18500
-    assert opt_res["expected_choice"]["delay_hours"] == 0.0

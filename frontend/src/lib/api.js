@@ -111,32 +111,4 @@ export async function sendChatQuery(query, sessionId = 'default') {
   return response.json()
 }
 
-export async function simulateDisruption(payload) {
-  const response = await fetch('/api/simulate', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload),
-  })
-  if (!response.ok) {
-    const body = await response.json().catch(() => ({}))
-    throw new Error(body.detail || 'Failed to simulate disruption')
-  }
-  const data = await response.json()
-  return data.impact || data
-}
-
-export async function optimizeRecovery(event) {
-  const response = await fetch('/api/recover', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ event }),
-  })
-  if (!response.ok) {
-    const body = await response.json().catch(() => ({}))
-    throw new Error(body.detail || 'Failed to optimize recovery')
-  }
-  const data = await response.json()
-  return data.recovery || data
-}
-
 

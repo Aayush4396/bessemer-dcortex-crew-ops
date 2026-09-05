@@ -1,14 +1,12 @@
 import { useState } from 'react'
 import { NavLink, useLocation } from 'react-router-dom'
-import { Bot, ChevronLeft, ChevronRight, Flame, Plane, Sparkles, Users } from 'lucide-react'
+import { Bot, ChevronLeft, ChevronRight, Plane, Users } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 const items = [
   { to: '/', label: 'Pairings Control', icon: Plane, badgeKey: 'pairings' },
   { to: '/crew', label: 'Crew Management', icon: Users, badgeKey: 'crew' },
   { to: '/copilot', label: 'Tactical Copilot', icon: Bot },
-  { to: '/simulator', label: 'Disruption Simulator', icon: Flame },
-  { to: '/recovery', label: 'Recovery Optimizer', icon: Sparkles },
 ]
 
 export function AppSidebar({ pairingCount = 0, crewCount = 0 }) {

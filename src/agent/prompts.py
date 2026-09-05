@@ -133,9 +133,6 @@ Illustration: SELECT c.crew_id, c.name FROM crew c WHERE c.rank = 'Captain' AND 
 Lookups: query_reserve_crew, query_flight_schedule, query_station_departures, query_station_arrivals, query_station_movements, query_flight_schedule_stats, query_crew_profile, query_crew_detail, query_pairing_roster, query_pairing, query_flight_duty_times, query_crew_duty_balance, query_database, query_expiring_certifications, query_crew_risk_signal, query_cost_rates.
 Single-rule checks: check_fdp_limit, check_duty_7d, check_flight_28d, check_rest, check_qualification, check_certifications, check_base_positioning.
 Cover legality (preferred for assign/cover/breach): check_cover.
-Disruption impact / uncrewed cascade: simulate_disruption_impact.
-Ranked recovery + costs: optimize_disruption_recovery.
-Dispatch callout draft: generate_callout_notification_draft.
 
 Other lookups:
 - Hour lists → query_database or check_duty_7d(min_hours=…)

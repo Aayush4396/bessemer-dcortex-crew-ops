@@ -12,7 +12,7 @@ The system is validated across multiple layers:
 ## 1. Automated Pytest Suite Catalog (92 Tests Passing)
 
 ```powershell
-.venv\Scripts\pytest.exe tests/test_api.py tests/test_entity_detail.py tests/test_pairings_workspace.py tests/test_router.py tests/test_rules.py tests/test_tier1.py tests/test_tier2.py tests/test_tier3.py -v
+.venv\Scripts\pytest.exe tests/test_api.py tests/test_entity_detail.py tests/test_pairings_workspace.py tests/test_router.py tests/test_rules.py tests/test_tier1.py tests/test_tier2.py -v
 ```
 
 ```
@@ -21,14 +21,13 @@ The system is validated across multiple layers:
 
 | Test Suite Module | Test Count | Domain Responsibilities & Verification Focus |
 |:---|:---:|:---|
-| [`tests/test_api.py`](file:///c:/Users/aayus/OneDrive/Desktop/bessemer_dcortex/tests/test_api.py) | **10** | Backend REST endpoints: `/api/health`, `/api/stats`, `/api/chat`, session lifecycle (CRUD), active disruption simulator (`/api/simulate`), and recovery optimizer (`/api/recover`). |
+| [`tests/test_api.py`](file:///c:/Users/aayus/OneDrive/Desktop/bessemer_dcortex/tests/test_api.py) | | Backend REST endpoints: `/api/health`, `/api/stats`, `/api/chat`, and session lifecycle (CRUD). |
 | [`tests/test_entity_detail.py`](file:///c:/Users/aayus/OneDrive/Desktop/bessemer_dcortex/tests/test_entity_detail.py) | **11** | Entity 360 handlers: flight detail resolution, crew profile assembly, 150-crew directory filtering, and graceful 404 handling. |
 | [`tests/test_pairings_workspace.py`](file:///c:/Users/aayus/OneDrive/Desktop/bessemer_dcortex/tests/test_pairings_workspace.py) | **20** | Tactical pairings workspace: KPI summary parity, 2-day rotation grouping, composite risk scoring, risk band filters, and cert/duty risk elevations. |
 | [`tests/test_router.py`](file:///c:/Users/aayus/OneDrive/Desktop/bessemer_dcortex/tests/test_router.py) | **6** | LangGraph ReAct agent: 13-tool registry mapping, cyclic graph compilation, conditional edge routing, and multi-tier tool execution in `tools_node`. |
 | [`tests/test_rules.py`](file:///c:/Users/aayus/OneDrive/Desktop/bessemer_dcortex/tests/test_rules.py) | **10** | Programmatic CAR legality engine: FDP limits (Table A), 7d duty / 28d flight rolling windows, 12h rest, type ratings, cert validities, base geometry, and multi-day accumulation. |
 | [`tests/test_tier1.py`](file:///c:/Users/aayus/OneDrive/Desktop/bessemer_dcortex/tests/test_tier1.py) | **16** | Deterministic operational queries: Direct ground-truth validation for the 16 Tier 1 benchmark questions (Q01–Q16). |
-| [`tests/test_tier2.py`](file:///c:/Users/aayus/OneDrive/Desktop/bessemer_dcortex/tests/test_tier2.py) | **11** | Disruption consequence simulator: Scenarios S1–S6, airport closures (BLR, HYD), rotational delay cascades (VT-DXA), held-out H1, and delay sensitivity spectra. |
-| [`tests/test_tier3.py`](file:///c:/Users/aayus/OneDrive/Desktop/bessemer_dcortex/tests/test_tier3.py) | **8** | Recovery optimizer: Scenarios S1–S6 recovery, candidate ranking, INR financial costing, combinatorial joint solver, and official dispatch callout drafter (Q36). |
+| [`tests/test_tier2.py`](file:///c:/Users/aayus/OneDrive/Desktop/bessemer_dcortex/tests/test_tier2.py) | | Rule-check handlers for Q17–Q30: pairing absence, cover legality, duty/FDP/rest, stations, and seat-risk by type. |
 
 ---
 

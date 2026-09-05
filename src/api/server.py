@@ -3,12 +3,10 @@ src/api/server.py
 =================
 FastAPI backend server for the dCortex Crew Operations Advisor.
 Exposes REST endpoints for conversational AI chat, live database statistics,
-and placeholder endpoints for Tier 2 (Disruption Simulator) and Tier 3 (Recovery Optimizer).
+and entity lookup endpoints for pairings, crew, and flights.
 """
 
-import json
 import os
-from pathlib import Path
 from typing import Any
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -27,8 +25,6 @@ from src.rules.models import SNAPSHOT_DATE
 from src.tier1.connection import get_connection
 from src.tier1.entity_detail import get_crew_detail, get_flight_detail, list_crew
 from src.tier1.pairings_workspace import get_pairing, get_pairings_workspace
-from src.tier2 import simulate_disruption
-from src.tier3 import load_costs, optimize_recovery
 
 app = FastAPI(
     title="dCortex Crew Operations Advisor API",
@@ -269,110 +265,3 @@ def remove_session(session_id: str):
     """Delete a session and all its associated messages."""
     delete_session(session_id)
     return {"status": "deleted", "session_id": session_id}
-
-
-@app.post("/api/simulate")
-def simulate_disruption_endpoint(payload: dict[str, Any] | None = None):
-    """
-    Tier 2 Disruption Consequence Simulator endpoint.
-    Simulates operational impact: uncovered flights, seats at risk, delays, and FDP breaches.
-    """
-    if not payload or not (payload.get("type") or payload.get("disruption_type") or payload.get("scenario_id") or payload.get("event")):
-        return {
-            "status": "placeholder",
-            "tier": 2,
-            "title": "Tier 2: Disruption Consequence Simulator",
-            "message": "Tier 2 Impact Simulator is fully active and operational.",
-            "scenarios": [
-                {
-                    "id": "S1",
-                    "title": "Unscheduled Sick Call (Capt C-3231 on DX451)",
-                    "impact": "Grounds 4 ATR sectors on P-2224 (288 seats at risk).",
-                },
-                {
-                    "id": "S2",
-                    "title": "Rolling 2-Day Pairing Sick Call (Capt C-1042)",
-                    "impact": "Triggers downstream pairing breakage on P-2291 across BLR/DEL.",
-                },
-                {
-                    "id": "S3",
-                    "title": "Station Weather Closure (BLR 08:00-14:00Z)",
-                    "impact": "13 flights affected, delay-to-reopen analysis with crew FDP feasibility.",
-                },
-                {
-                    "id": "S4",
-                    "title": "Rotational 90m Technical Delay (VT-DXA)",
-                    "impact": "Triggers downstream FDP extension breach on tail sector DX404.",
-                },
-                {
-                    "id": "S5",
-                    "title": "Pre-Flight Recurrent Training Expiration (C-5417)",
-                    "impact": "Breaches RULE-CERT-06 on 19 Sep VT-DXB rotation.",
-                },
-                {
-                    "id": "S6",
-                    "title": "Simultaneous Dual Captain Sick Calls",
-                    "impact": "Two concurrent Captain incapacitations across VT-DXA and VT-DXB.",
-                },
-            ],
-        }
-
-    event = payload.get("event") or payload
-    if "scenario_id" in event:
-        sid = event["scenario_id"].upper()
-        scs = json.loads((Path(__file__).resolve().parents[2] / "data" / "scenarios.json").read_text(encoding="utf-8"))
-        match = next((s for s in scs if s["scenario_id"].upper() == sid), None)
-        if match:
-            event = match["event"]
-
-    try:
-        conn = get_connection()
-        result = simulate_disruption(event, conn=conn)
-        return {
-            "status": "success",
-            "tier": 2,
-            "impact": result,
-        }
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Simulation error: {str(e)}")
-
-
-@app.post("/api/recover")
-def recovery_optimizer_endpoint(payload: dict[str, Any] | None = None):
-    """
-    Tier 3 Recovery Candidate Ranker & Cost Optimizer endpoint.
-    Generates ranked legal recovery options, computes exact INR costs, and identifies excluded candidates.
-    """
-    if not payload or not (payload.get("type") or payload.get("disruption_type") or payload.get("scenario_id") or payload.get("event")):
-        return {
-            "status": "placeholder",
-            "tier": 3,
-            "title": "Tier 3: Recovery Candidate Ranker & Cost Optimizer",
-            "message": "Tier 3 Recovery Optimizer is fully active and operational.",
-            "capabilities": [
-                "Candidate Pool Generation from Active Reserves, Home Base Standbys, and Off-Duty Crew",
-                "Deterministic DGCA CAR Legality Pre-Filter (FDP, Rest, 7d/28d Headroom, Type Ratings)",
-                "Exact Multi-Variable Cost Optimization in INR (Callout Fee + Deadhead + Delay Penalty)",
-                "Automated Multi-Channel Notification Drafter (WhatsApp / SMS / Crew App Alert)",
-            ],
-            "cost_rates": load_costs(),
-        }
-
-    event = payload.get("event") or payload
-    if "scenario_id" in event:
-        sid = event["scenario_id"].upper()
-        scs = json.loads((Path(__file__).resolve().parents[2] / "data" / "scenarios.json").read_text(encoding="utf-8"))
-        match = next((s for s in scs if s["scenario_id"].upper() == sid), None)
-        if match:
-            event = match["event"]
-
-    try:
-        conn = get_connection()
-        result = optimize_recovery(event, conn=conn)
-        return {
-            "status": "success",
-            "tier": 3,
-            "recovery": result,
-        }
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Recovery optimization error: {str(e)}")

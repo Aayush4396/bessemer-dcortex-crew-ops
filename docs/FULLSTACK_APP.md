@@ -74,18 +74,6 @@ The backend exposes a high-performance REST API built with FastAPI and Pydantic:
 | `POST` | `/api/sessions` | Creates a new chat session with an optional custom title. | `CreateSessionRequest` | `SessionItem` |
 | `GET` | `/api/sessions/{id}` | Fetches full session metadata and uncompacted conversation history. | None | `{"session_id": "...", "messages": [...]}` |
 | `DELETE`| `/api/sessions/{id}` | Cascades deletion of a session and all its messages. | None | `{"status": "deleted", "session_id": "..."}` |
-| `POST` | `/api/simulate` | **Tier 2 Disruption Simulator**: Simulates operational impact, uncovered flights, and FDP breaches. | `{"scenario_id": "S1"}` or raw event payload | `{"status": "success", "tier": 2, "impact": {...}}` |
-| `POST` | `/api/recover` | **Tier 3 Recovery Optimizer**: Generates ranked legal recovery options and exact INR costs. | `{"scenario_id": "S1"}` or raw event payload | `{"status": "success", "tier": 3, "recovery": {...}}` |
-
-### Active Disruption Simulator Endpoint (`POST /api/simulate`)
-- **By Scenario ID**: Pass `{"scenario_id": "S1"}` to automatically load Scenario S1 from `data/scenarios.json` and simulate the impact.
-- **By Raw Event**: Pass `{"type": "SICK_CREW", "crew_id": "C-3231", "pairing_id": "P-2224", "reported_utc": "..."}` to run a dynamic simulation.
-- **Empty Payload**: Returns the catalog of scenarios (S1–S6) and capabilities.
-
-### Active Recovery Optimizer Endpoint (`POST /api/recover`)
-- **By Scenario ID**: Pass `{"scenario_id": "S2"}` to optimize recovery for Scenario S2.
-- **By Raw Event**: Pass `{"type": "SICK_CREW", "crew_id": "C-1042", "pairing_id": "P-2291", "reported_utc": "..."}` to discover, filter, and rank replacement candidates.
-- **Empty Payload**: Returns optimizer capabilities and live financial cost parameters from `data/costs.json`.
 
 ---
 

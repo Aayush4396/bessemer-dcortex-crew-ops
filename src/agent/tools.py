@@ -36,9 +36,7 @@ from src.tier2 import (
     get_flight_duty_times,
     get_pairing_entity,
     get_station_movements,
-    simulate_disruption,
 )
-from src.tier3 import generate_callout_notification, optimize_recovery
 
 
 @tool
@@ -545,124 +543,6 @@ def check_cover(
     )
 
 
-# ---------------------------------------------------------------------------
-# Tier 2 Disruption Simulation Tools
-# ---------------------------------------------------------------------------
-
-@tool
-def simulate_disruption_impact(
-    event_type: str,
-    crew_id: str | None = None,
-    pairing_id: str | None = None,
-    station: str | None = None,
-    start_utc: str | None = None,
-    end_utc: str | None = None,
-    aircraft: str | None = None,
-    date: str | None = None,
-    delay_hours: float | None = None,
-    delay_minutes: int | None = None,
-) -> dict[str, Any]:
-    """
-    Simulate the operational consequences and cascading impacts of a disruption event (Tier 2).
-    Determines uncrewed flight sectors, passenger seats at risk, multi-day pairing breakage,
-    rotational duty delays, and DGCA CAR FDP limit breaches.
-
-    Parameters:
-    - event_type: 'SICK_CREW', 'STATION_CLOSURE', 'DELAY', or 'CERT_EXPIRY'
-    - crew_id: Affected crew member ID (e.g. 'C-1042', 'C-3231', 'C-5417')
-    - pairing_id: Broken pairing ID (e.g. 'P-2291', 'P-2224')
-    - station: Airport station closed (e.g. 'BLR', 'DEL', 'HYD')
-    - start_utc: Closure window start timestamp or time (e.g. '2026-09-17T08:00:00Z')
-    - end_utc: Closure window end timestamp or time (e.g. '2026-09-17T14:00:00Z')
-    - aircraft: Delayed aircraft registration (e.g. 'VT-DXA', 'VT-DXB')
-    - date: Date of duty 'YYYY-MM-DD' (e.g. '2026-09-16')
-    - delay_hours: Duration of delay in hours (e.g. 1.5)
-    - delay_minutes: Duration of delay in minutes (e.g. 90)
-    """
-    payload: dict[str, Any] = {"type": event_type}
-    if crew_id:
-        payload["crew_id"] = crew_id
-    if pairing_id:
-        payload["pairing_id"] = pairing_id
-    if station:
-        payload["station"] = station
-    if start_utc or end_utc:
-        payload["window_utc"] = {"start": start_utc, "end": end_utc}
-    if aircraft:
-        payload["aircraft"] = aircraft
-    if date:
-        payload["date"] = date
-    if delay_hours is not None:
-        payload["delay_hours"] = float(delay_hours)
-    elif delay_minutes is not None:
-        payload["delay_hours"] = float(delay_minutes) / 60.0
-
-    return simulate_disruption(payload)
-
-
-# ---------------------------------------------------------------------------
-# Tier 3 Recovery Optimization Tools
-# ---------------------------------------------------------------------------
-
-@tool
-def optimize_disruption_recovery(
-    event_type: str,
-    crew_id: str | None = None,
-    pairing_id: str | None = None,
-    role: str | None = None,
-    station: str | None = None,
-    aircraft: str | None = None,
-    date: str | None = None,
-    delay_hours: float | None = None,
-) -> dict[str, Any]:
-    """
-    Generate ranked legal recovery options and cost trade-offs for an operational disruption (Tier 3).
-    Evaluates candidate pools (active reserves, day-offs, deadhead positioning) against all 7 DGCA CAR rules,
-    computes exact financial costs in INR, identifies excluded candidates with specific rule violation reasons,
-    and returns ranked options sorted by delay and cost.
-
-    Parameters:
-    - event_type: Disruption type: 'SICK_CREW', 'DELAY', 'CERT_EXPIRY', or 'MULTI_SICK'
-    - crew_id: Incapacitated or affected crew ID (e.g. 'C-1042', 'C-3231')
-    - pairing_id: Broken pairing ID needing replacement crew (e.g. 'P-2291')
-    - role: Rank/role needing cover ('Captain', 'First Officer', 'Senior Cabin Crew', 'Cabin Crew')
-    - station: Base station needing coverage (e.g. 'BLR')
-    - aircraft: Delayed aircraft registration (e.g. 'VT-DXA')
-    - date: Date of duty 'YYYY-MM-DD'
-    - delay_hours: Rotational delay duration in hours
-    """
-    payload: dict[str, Any] = {"type": event_type}
-    if crew_id:
-        payload["crew_id"] = crew_id
-    if pairing_id:
-        payload["pairing_id"] = pairing_id
-    if role:
-        payload["role"] = role
-    if station:
-        payload["station"] = station
-    if aircraft:
-        payload["aircraft"] = aircraft
-    if date:
-        payload["date"] = date
-    if delay_hours is not None:
-        payload["delay_hours"] = float(delay_hours)
-
-    return optimize_recovery(payload)
-
-
-@tool
-def generate_callout_notification_draft(
-    crew_id: str,
-    pairing_id: str,
-) -> dict[str, Any]:
-    """
-    Generate an official, structured Crew Operations Dispatch callout notification alert (Tier 3).
-    Includes mandatory operational fields: pairing ID, report time, location, flight details,
-    overnight layover accommodations, acknowledgement deadline, and dispatch contact details.
-    """
-    return generate_callout_notification(crew_id=crew_id, pairing_id=pairing_id)
-
-
 TIER1_TOOLS = [
     query_flight_schedule,
     query_station_departures,
@@ -677,7 +557,6 @@ TIER1_TOOLS = [
 ]
 
 TIER2_TOOLS = [
-    simulate_disruption_impact,
     query_flight_duty_times,
     query_pairing,
     query_crew_detail,
@@ -694,10 +573,5 @@ TIER2_TOOLS = [
     check_cover,
 ]
 
-TIER3_TOOLS = [
-    optimize_disruption_recovery,
-    generate_callout_notification_draft,
-]
-
-ALL_TOOLS = TIER1_TOOLS + TIER2_TOOLS + TIER3_TOOLS
+ALL_TOOLS = TIER1_TOOLS + TIER2_TOOLS
 TOOL_MAP = {t.name: t for t in ALL_TOOLS}

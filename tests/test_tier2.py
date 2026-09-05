@@ -1,268 +1,350 @@
 """
 tests/test_tier2.py
 ===================
-Unit tests for Tier 2 Disruption Simulator against operational scenarios S1-S6
-and Tier 2 benchmark questions from questions.json.
+Deterministic handler tests for Tier 2 questions Q17–Q30.
 """
 
 import json
 import sys
 from pathlib import Path
 
-# Add project root to sys.path
+import pytest
+
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-import pytest
 from src.db.loader import init_db
+from src.tier1 import get_flight_schedule_stats, get_flights
 from src.tier2 import (
-    simulate_cert_expiry,
-    simulate_disruption,
-    simulate_flight_delay,
-    simulate_sick_crew,
-    simulate_station_closure,
+    execute_readonly_sql,
+    evaluate_base_positioning,
+    evaluate_certifications,
+    evaluate_cover,
+    evaluate_cover_candidates,
+    evaluate_duty_7d,
+    evaluate_fdp_limit,
+    evaluate_qualification,
+    evaluate_reserve_callout,
+    evaluate_rest,
+    get_cost_rates,
+    get_crew_entity,
+    get_flight_duty_times,
+    get_pairing_entity,
+    get_station_movements,
 )
+from src.tier2.entities import _absence_impact
+
+_QUESTIONS = json.loads((Path(__file__).parent.parent / "data" / "questions.json").read_text(encoding="utf-8"))
+_Q = {q["question_id"]: q for q in _QUESTIONS}
 
 
 @pytest.fixture(scope="session")
 def conn():
-    """In-memory or connection to initialized crew_ops database."""
     return init_db()
 
 
-def test_scenario_s1_atr_captain_sick(conn):
-    """S1: ATR captain C-3231 sick call on 16 Sep for P-2224."""
-    event = {
-        "type": "SICK_CREW",
-        "crew_id": "C-3231",
-        "pairing_id": "P-2224",
-        "reported_utc": "2026-09-16T01:30:00Z",
-    }
-    res = simulate_disruption(event, conn=conn)
+def test_q17_uncrewed_pairing(conn):
+    expected = _Q["Q17"]["expected_answer"]
+    pairing = get_pairing_entity("P-2291", conn=conn)
+    assert pairing["days"][0]["flight_ids"] == expected["day1"]
+    assert pairing["days"][1]["flight_ids"] == expected["day2_also_at_risk"]
+    assert pairing["passengers_day1"] == expected["passengers_day1"]
+    assert pairing["rotation_days"] == 2
+    impact = pairing["absence_impact"]
+    assert [d["date"] for d in impact["days"]] == [d["date"] for d in pairing["days"]]
+    assert impact["immediately_uncrewed"] == expected["day1"]
+    assert impact["subsequent_at_risk"] == expected["day2_also_at_risk"]
+    assert impact["days"][0]["impact"] == "immediately_uncrewed"
+    assert impact["days"][1]["impact"] == "at_risk"
+    assert impact["passengers_immediately_uncrewed"] == expected["passengers_day1"]
+    assert impact["day1"] == expected["day1"]
+    assert impact["day2_also_at_risk"] == expected["day2_also_at_risk"]
+    assert impact["passengers_day1"] == expected["passengers_day1"]
 
-    assert res["disruption_type"] == "SICK_CREW"
-    assert res["crew_id"] == "C-3231"
-    assert res["role"] == "Captain"
-    assert res["aircraft_type"] == "ATR72"
-    assert res["uncovered_flights"] == [
-        "DX451-2026-09-16",
-        "DX452-2026-09-16",
-        "DX453-2026-09-16",
-        "DX454-2026-09-16",
+    day2 = get_pairing_entity("P-2291", conn=conn, as_of_date="2026-09-16")
+    late = day2["absence_impact"]
+    assert late["already_operated"] == expected["day1"]
+    assert late["immediately_uncrewed"] == expected["day2_also_at_risk"]
+    assert late["subsequent_at_risk"] == []
+
+
+def test_absence_impact_lists_every_later_day():
+    days = [
+        {
+            "day_index": i,
+            "date": f"2026-09-{14 + i:02d}",
+            "flight_ids": [f"DX{i}00"],
+            "passengers": 100 * i,
+            "dep_station": "BLR",
+        }
+        for i in (1, 2, 3)
     ]
-    # ATR72 is 72 seats * 4 legs = 288 seats
-    assert res["passengers_at_risk"] == 288
-
-
-def test_scenario_s2_flagship_captain_sick_multiday(conn):
-    """S2: Flagship captain C-1042 sick call for 2-day pairing P-2291."""
-    event = {
-        "type": "SICK_CREW",
-        "crew_id": "C-1042",
-        "pairing_id": "P-2291",
-        "reported_utc": "2026-09-15T05:00:00Z",
-    }
-    res = simulate_disruption(event, conn=conn)
-
-    assert res["disruption_type"] == "SICK_CREW"
-    assert res["crew_id"] == "C-1042"
-    assert res["is_multi_day"] is True
-    assert res["uncovered_flights_day1"] == [
-        "DX412-2026-09-15",
-        "DX413-2026-09-15",
-        "DX588-2026-09-15",
+    impact = _absence_impact(days, "2026-09-15")
+    assert [d["impact"] for d in impact["days"]] == [
+        "immediately_uncrewed",
+        "at_risk",
+        "at_risk",
     ]
-    assert res["uncovered_flights_day2"] == [
-        "DX589-2026-09-16",
-        "DX590-2026-09-16",
-        "DX591-2026-09-16",
-    ]
-    # Day 1 has 3 A320 flights (162 seats * 3 = 486 seats)
-    assert res["passengers_at_risk_day1"] == 486
+    assert impact["immediately_uncrewed"] == ["DX100"]
+    assert impact["subsequent_at_risk"] == ["DX200", "DX300"]
+    assert impact["already_operated"] == []
 
 
-def test_scenario_s3_blr_station_closure(conn):
-    """S3: BLR closed 08:00-14:00Z on 17 Sep (13 flights affected)."""
-    event = {
-        "type": "STATION_CLOSURE",
-        "station": "BLR",
-        "window_utc": {
-            "start": "2026-09-17T08:00:00Z",
-            "end": "2026-09-17T14:00:00Z",
-        },
-    }
-    res = simulate_disruption(event, conn=conn)
-
-    expected_flights = [
-        "DX402-2026-09-17",
-        "DX422-2026-09-17",
-        "DX462-2026-09-17",
-        "DX453-2026-09-17",
-        "DX433-2026-09-17",
-        "DX403-2026-09-17",
-        "DX413-2026-09-17",
-        "DX423-2026-09-17",
-        "DX454-2026-09-17",
-        "DX434-2026-09-17",
-        "DX404-2026-09-17",
-        "DX424-2026-09-17",
-        "DX588-2026-09-17",
-    ]
-    assert res["affected_flights"] == expected_flights
-    assert len(res["per_flight_assessment"]) == 13
-
-    # Check DX402: 5.75h delay, 17.0h crew FDP, exceeds 12.0h limit
-    dx402 = next(a for a in res["per_flight_assessment"] if a["flight_id"] == "DX402-2026-09-17")
-    assert dx402["min_delay_hours"] == 5.75
-    assert dx402["crew_fdp_after_delay"] == 17.0
-    assert dx402["fdp_limit"] == 12.0
-    assert "re-crew tail legs" in dx402["action"]
-
-    # Check DX462: 2 sectors (limit 13h), 11.0h crew FDP -> legal
-    dx462 = next(a for a in res["per_flight_assessment"] if a["flight_id"] == "DX462-2026-09-17")
-    assert dx462["crew_fdp_after_delay"] == 11.0
-    assert dx462["fdp_limit"] == 13.0
-    assert "crew legal" in dx462["action"]
+def test_q18_duty_cover_c2087(conn):
+    expected = _Q["Q18"]["expected_answer"]
+    result = evaluate_duty_7d(crew_id="C-2087", pairing_id="P-2291", conn=conn)
+    assert result["legal"] is False
+    assert result["issues"] == expected["issues"]
+    cover = evaluate_cover(crew_id="C-2087", pairing_id="P-2291", conn=conn)
+    assert cover["legal"] is False
+    assert cover["issues"] == expected["issues"]
 
 
-def test_scenario_s4_flight_delay_fdp_breach(conn):
-    """S4: VT-DXA 90-minute delay before DX401 on 16 Sep causes FDP breach."""
-    event = {
-        "type": "DELAY",
-        "aircraft": "VT-DXA",
-        "date": "2026-09-16",
-        "delay_hours": 1.5,
-    }
-    res = simulate_disruption(event, conn=conn)
-
-    assert res["aircraft"] == "VT-DXA"
-    assert res["fdp_after_delay"] == 12.75
-    assert res["fdp_limit"] == 12.0
-    assert res["breach"] is True
-    assert "delayed duty runs 12.75h vs 12.0h limit" in res["breach_detail"]
-    assert "DX404" in res["breach_detail"]
+def test_q19_blr_closure(conn):
+    expected = _Q["Q19"]["expected_answer"]
+    actual = get_station_movements("BLR", "2026-09-17", "08:00", "14:00", conn=conn)
+    assert actual == expected
 
 
-def test_scenario_s5_cert_expiry_preflight(conn):
-    """S5: C-5417 recurrent training lapsed before 19 Sep duty."""
-    event = {
-        "type": "CERT_EXPIRY",
-        "crew_id": "C-5417",
-        "pairing_id": "P-2213",
-        "reported_utc": "2026-09-18T10:00:00Z",
-    }
-    res = simulate_disruption(event, conn=conn)
-
-    assert res["crew_id"] == "C-5417"
-    assert res["role"] == "Cabin Crew"
-    assert res["date"] == "2026-09-19"
-    assert res["lapsed_cert"] == "recurrent_training"
-    assert res["illegal_assignment"] == {
-        "crew_id": "C-5417",
-        "date": "2026-09-19",
-        "rule": "RULE-CERT-06",
-    }
-
-
-def test_scenario_s6_multi_sick(conn):
-    """S6: Multi-crew sick calls on 18 Sep."""
-    event = {
-        "type": "MULTI_SICK",
-        "events": [
-            {"crew_id": "C-3940", "pairing_id": "P-2205", "reported_utc": "2026-09-18T00:30:00Z"},
-            {"crew_id": "C-1938", "pairing_id": "P-2212", "reported_utc": "2026-09-18T00:30:00Z"},
-        ],
-    }
-    res = simulate_disruption(event, conn=conn)
-
-    assert res["disruption_type"] == "MULTI_SICK"
-    assert len(res["sub_impacts"]) == 2
-    assert res["sub_impacts"][0]["crew_id"] == "C-3940"
-    assert res["sub_impacts"][1]["crew_id"] == "C-1938"
-    assert len(res["uncovered_flights_total"]) == 8
-
-
-def test_generalizability_hyd_closure(conn):
-    """Q29: HYD station closure 05:00-09:00Z on 19 Sep."""
-    event = {
-        "type": "STATION_CLOSURE",
-        "station": "HYD",
-        "window_utc": {
-            "start": "2026-09-19T05:00:00Z",
-            "end": "2026-09-19T09:00:00Z",
-        },
-    }
-    res = simulate_station_closure(
-        station="HYD",
-        start_utc="2026-09-19T05:00:00Z",
-        end_utc="2026-09-19T09:00:00Z",
+def test_q20_fdp_delay(conn):
+    expected = _Q["Q20"]["expected_answer"]
+    result = evaluate_fdp_limit(
+        aircraft="VT-DXA",
+        date="2026-09-16",
+        delay_hours=1.5,
         conn=conn,
     )
-    assert res["station"] == "HYD"
-    assert len(res["affected_flights"]) > 0
-    # Every affected flight must touch HYD
-    for fid in res["affected_flights"]:
-        f_row = conn.execute("SELECT dep_station, arr_station FROM flights WHERE flight_id = ?", (fid,)).fetchone()
-        assert "HYD" in (f_row["dep_station"], f_row["arr_station"])
+    assert result["breach"] is True
+    assert result["fdp_after_delay"] == expected["fdp_after_delay"]
+    assert result["fdp_limit"] == expected["fdp_limit"]
 
 
-def test_held_out_h1_atr_fo_sick(conn):
-    """H1: ATR First Officer sick call on 16 Sep (P-2224)."""
-    p_row = conn.execute("SELECT pairing_id FROM pairings WHERE date = '2026-09-16' AND aircraft = 'VT-DXE'").fetchone()
-    fo_row = conn.execute("SELECT pc.crew_id FROM pairing_crew pc WHERE pc.pairing_id = ? AND pc.role = 'First Officer'", (p_row['pairing_id'],)).fetchone()
-    res = simulate_disruption({
-        "type": "SICK_CREW",
-        "crew_id": fo_row['crew_id'],
-        "pairing_id": p_row['pairing_id'],
-        "reported_utc": "2026-09-16T02:00:00Z",
-    }, conn=conn)
-    assert res["role"] == "First Officer"
-    assert res["aircraft_type"] == "ATR72"
-    assert res["passengers_at_risk"] == 288
-    assert len(res["uncovered_flights"]) == 4
+def test_q21_deadhead_c2210(conn):
+    expected = _Q["Q21"]["expected_answer"]
+    pos = evaluate_base_positioning("C-2210", "P-2291", conn=conn)
+    assert pos["legal"] is True
+    assert pos["needs_deadhead"] is True
+    assert pos["delay_hours"] == 3.0
+    assert pos["cost_inr"] == 41200
+    assert pos["consequence"] == expected["consequence"]
+    cover = evaluate_cover(crew_id="C-2210", pairing_id="P-2291", conn=conn)
+    assert cover["legal"] is True
+    assert cover["issues"] == []
+    assert cover["consequence"] == expected["consequence"]
+    rest = evaluate_rest(crew_id="C-2210", pairing_id="P-2291", conn=conn)
+    duty = evaluate_duty_7d(crew_id="C-2210", pairing_id="P-2291", conn=conn)
+    qual = evaluate_qualification(crew_id="C-2210", pairing_id="P-2291", conn=conn)
+    assert rest["legal"] is True
+    assert duty["legal"] is True
+    assert qual["passed"] is True
 
 
-def test_station_closure_del_fog(conn):
-    """Generalization: DEL hub closure 02:00-08:00Z on 15 Sep (dense fog)."""
-    res = simulate_station_closure(
-        station="DEL",
-        start_utc="2026-09-15T02:00:00Z",
-        end_utc="2026-09-15T08:00:00Z",
+def test_q22_cert_c5417(conn):
+    expected = _Q["Q22"]["expected_answer"]
+    result = evaluate_certifications("C-5417", "2026-09-19", conn=conn)
+    assert result["legal"] is False
+    assert result["rule"] == expected["rule"]
+    assert result["detail"] == expected["detail"]
+
+
+def test_q23_earliest_report():
+    expected = _Q["Q23"]["expected_answer"]
+    result = evaluate_rest(release_utc="2026-09-16T15:30:00Z")
+    assert result["earliest_report_utc"] == expected
+
+
+def test_q24_duty_cover_c3305(conn):
+    expected = _Q["Q24"]["expected_answer"]
+    result = evaluate_duty_7d(crew_id="C-3305", pairing_id="P-2291", conn=conn)
+    assert result["legal"] is False
+    assert result["issues"] == expected["issues"]
+    cover = evaluate_cover(crew_id="C-3305", pairing_id="P-2291", conn=conn)
+    assert cover["legal"] is False
+    assert cover["issues"] == expected["issues"]
+
+
+def test_q25_cancellation_cost(conn):
+    expected = _Q["Q25"]["expected_answer"]
+    flights = get_flights(date="2026-09-16", flight_no="DX404", conn=conn)
+    costs = get_cost_rates()
+    assert flights[0]["seats"] == expected["passengers"]
+    assert costs["cancellation_per_flight"] == expected["cost_inr"]
+
+
+def test_q26_near_duty_cap(conn):
+    expected = _Q["Q26"]["expected_answer"]
+    result = evaluate_duty_7d(as_of_date="2026-09-15", min_hours=45, conn=conn)
+    assert result["crew"] == expected
+
+
+def test_query_database_weekly_and_monthly(conn):
+    weekly = execute_readonly_sql(
+        """
+        SELECT c.crew_id, c.name, c.rank, d.duty_hours_7d
+        FROM crew c
+        JOIN duty_clocks d ON d.crew_id = c.crew_id
+        WHERE d.duty_hours_7d < 30
+        ORDER BY d.duty_hours_7d ASC
+        """,
         conn=conn,
     )
-    assert res["station"] == "DEL"
-    assert len(res["affected_flights"]) == 2
-    for a in res["per_flight_assessment"]:
-        assert "delay exceeds crew FDP" in a["action"]
+    assert "error" not in weekly
+    assert weekly["row_count"] > 0
+    assert {"crew_id", "name", "rank", "duty_hours_7d"} <= set(weekly["columns"])
+    assert all(row["duty_hours_7d"] < 30 for row in weekly["rows"])
+
+    monthly = execute_readonly_sql(
+        """
+        SELECT c.crew_id, c.name, c.rank, d.flight_hours_28d
+        FROM crew c
+        JOIN duty_clocks d ON d.crew_id = c.crew_id
+        WHERE d.flight_hours_28d >= 0
+        ORDER BY d.flight_hours_28d DESC
+        LIMIT 5
+        """,
+        conn=conn,
+    )
+    assert monthly["row_count"] == 5
+    assert "flight_hours_28d" in monthly["columns"]
 
 
-def test_delay_sensitivity_spectrum(conn):
-    """Generalization: 30m buffer vs 60m/90m FDP breach on 4-sector line."""
-    # 30m delay absorbed
-    res_30 = simulate_flight_delay(aircraft="VT-DXA", date="2026-09-16", delay_hours=0.5, conn=conn)
-    assert res_30["breach"] is False
-    assert res_30["fdp_after_delay"] <= res_30["fdp_limit"]
-
-    # 60m delay breaches
-    res_60 = simulate_flight_delay(aircraft="VT-DXA", date="2026-09-16", delay_hours=1.0, conn=conn)
-    assert res_60["breach"] is True
-    assert res_60["fdp_after_delay"] > res_60["fdp_limit"]
+def test_query_database_rejects_writes(conn):
+    blocked = execute_readonly_sql("DELETE FROM crew", conn=conn)
+    assert "error" in blocked
+    chat = execute_readonly_sql("SELECT * FROM chat_messages", conn=conn)
+    assert "error" in chat
 
 
-def test_dual_cockpit_incapacitation_deduplication(conn):
-    """Generalization: Captain + FO sick on same flight does not duplicate seats/flights."""
-    p_row = conn.execute("SELECT pairing_id FROM pairings WHERE date = '2026-09-15' AND aircraft = 'VT-DXD'").fetchone()
-    cpt = conn.execute("SELECT crew_id FROM pairing_crew WHERE pairing_id = ? AND role = 'Captain'", (p_row['pairing_id'],)).fetchone()['crew_id']
-    fo = conn.execute("SELECT crew_id FROM pairing_crew WHERE pairing_id = ? AND role = 'First Officer'", (p_row['pairing_id'],)).fetchone()['crew_id']
+def test_query_database_is_sqlite_dialect(conn):
+    pg = execute_readonly_sql(
+        "SELECT crew_id FROM crew WHERE 'A320' = ANY(ratings)",
+        conn=conn,
+    )
+    assert "error" in pg
+    assert "SQLite" in pg["error"]
+    ok = execute_readonly_sql(
+        """
+        SELECT c.crew_id FROM crew c
+        WHERE c.rank = 'Captain'
+          AND EXISTS (SELECT 1 FROM json_each(c.ratings) WHERE value = 'A320')
+        LIMIT 3
+        """,
+        conn=conn,
+    )
+    assert "error" not in ok
+    assert ok["row_count"] >= 1
 
-    res = simulate_disruption({
-        "type": "MULTI_SICK",
-        "events": [
-            {"crew_id": cpt, "pairing_id": p_row['pairing_id'], "reported_utc": "2026-09-15T02:00:00Z"},
-            {"crew_id": fo, "pairing_id": p_row['pairing_id'], "reported_utc": "2026-09-15T02:00:00Z"},
-        ],
-    }, conn=conn)
-    # Both positions incapacitated, 4 unique flights, 648 seats (162 * 4) without duplicate counting
-    assert len(res["sub_impacts"]) == 2
-    assert len(res["uncovered_flights_total"]) == 4
-    assert res["passengers_at_risk_total"] == 648
 
+def test_duty_split_lists_include_name_rank(conn):
+    result = evaluate_duty_7d(as_of_date="2026-09-14", split_hours=30, conn=conn)
+    assert result["below"] and result["above"]
+    sample = result["below"][0]
+    assert {"crew_id", "name", "rank", "duty_hours_7d"} <= set(sample)
+    assert all(r["duty_hours_7d"] < 30 for r in result["below"])
+    assert all(r["duty_hours_7d"] > 30 for r in result["above"])
+    counted = len(result["below"]) + len(result["equal"]) + len(result["above"])
+    roster = evaluate_duty_7d(as_of_date="2026-09-14", conn=conn)
+    assert counted == len(roster["crew"])
+
+
+def test_q27_reserve_callout(conn):
+    expected = _Q["Q27"]["expected_answer"]
+    result = evaluate_reserve_callout(
+        date="2026-09-16",
+        rank="Captain",
+        required_report_utc="2026-09-16T03:00:00Z",
+        aircraft_type="ATR72",
+        conn=conn,
+    )
+    assert result["eligible"] == expected["eligible"]
+    excluded_by_id = {e["crew_id"]: e["reason"] for e in result["excluded"]}
+    for example in expected["excluded_examples"]:
+        assert excluded_by_id[example["crew_id"]] == example["reason"]
+
+
+def test_q28_downstream_rest(conn):
+    expected = _Q["Q28"]["expected_answer"]
+    result = evaluate_rest(crew_id="C-5837", pairing_id="P-2291", conn=conn)
+    assert result["legal"] is False
+    assert result["issues"] == expected["issues"]
+    cover = evaluate_cover(crew_id="C-5837", pairing_id="P-2291", conn=conn)
+    assert cover["legal"] is False
+    assert cover["issues"] == expected["issues"]
+
+
+def test_cover_rejects_first_officer_for_captain_seat(conn):
+    fo_as_captain = evaluate_cover(
+        crew_id="C-1694",
+        pairing_id="P-2291",
+        role="Captain",
+        conn=conn,
+    )
+    assert fo_as_captain["legal"] is False
+    assert fo_as_captain["required_role"] == "Captain"
+    assert fo_as_captain["candidate_rank"] == "First Officer"
+    assert any("Rank mismatch" in issue for issue in fo_as_captain["issues"])
+
+    inferred = evaluate_cover(
+        crew_id="C-1694",
+        pairing_id="P-2291",
+        replace_crew_id="C-1042",
+        conn=conn,
+    )
+    assert any("vacant seat is Captain" in issue for issue in inferred["issues"])
+
+    fo_for_fo = evaluate_cover(
+        crew_id="C-1694",
+        pairing_id="P-2291",
+        role="First Officer",
+        conn=conn,
+    )
+    assert not any("Rank mismatch" in issue for issue in fo_for_fo["issues"])
+
+
+def test_cover_candidates_use_real_issues_not_invented_qual(conn):
+    result = evaluate_cover_candidates(
+        pairing_id="P-2291",
+        role="Captain",
+        replace_crew_id="C-1042",
+        conn=conn,
+    )
+    legal_ids = {row["crew_id"] for row in result["legal"]}
+    excluded_by_id = {row["crew_id"]: row["issues"] for row in result["excluded"]}
+    assert "C-1042" not in legal_ids
+    assert {"C-3310", "C-1526", "C-3983", "C-5566"} <= legal_ids
+    assert "C-2442" in excluded_by_id
+    assert any("leave" in issue for issue in excluded_by_id["C-2442"])
+    assert not any("A320 rating" in issue for issue in excluded_by_id.get("C-1526", []))
+    assert not any("A320 rating" in issue for issue in excluded_by_id.get("C-1017", []))
+    leave = evaluate_cover(crew_id="C-2442", pairing_id="P-2291", role="Captain", conn=conn)
+    assert leave["legal"] is False
+    assert any("leave" in issue for issue in leave["issues"])
+
+
+def test_q29_hyd_closure(conn):
+    expected = _Q["Q29"]["expected_answer"]
+    actual = get_station_movements("HYD", "2026-09-19", "05:00", "09:00", conn=conn)
+    assert actual == expected
+
+
+def test_q30_max_seats(conn):
+    a320 = get_flights(aircraft_type="A320", date="2026-09-15", conn=conn)
+    atr = get_flights(aircraft_type="ATR72", date="2026-09-15", conn=conn)
+    assert a320[0]["seats"] == 162
+    assert atr[0]["seats"] == 72
+    seats = get_flight_schedule_stats(metric="max_seats", conn=conn)
+    assert seats == _Q["Q30"]["expected_answer"]
+
+
+def test_flight_duty_times_join(conn):
+    duty = get_flight_duty_times(flight_id="DX412-2026-09-15", conn=conn)
+    assert duty["pairing_id"] == "P-2291"
+    assert duty["report_utc"] == "2026-09-15T06:00:00Z"
+    assert duty["release_utc"] == "2026-09-15T15:30:00Z"
+    assert any(m["crew_id"] == "C-1042" for m in duty["crew"])
+
+
+def test_crew_detail_join(conn):
+    crew = get_crew_entity("C-1042", conn=conn)
+    assert crew["crew_id"] == "C-1042"
+    assert any(p["pairing_id"] == "P-2291" for p in crew["pairings"])
+    assert crew["certs"]
