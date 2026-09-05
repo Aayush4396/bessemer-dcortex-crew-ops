@@ -16,6 +16,7 @@ from src.agent import run_crew_ops_agent
 from src.db.chat_store import (
     create_session,
     delete_session,
+    ensure_chat_tables,
     get_session,
     get_session_messages,
     list_sessions,
@@ -39,6 +40,12 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.on_event("startup")
+def _ensure_runtime_tables():
+    """Create chat session tables on an existing crew_ops.db that predates them."""
+    ensure_chat_tables()
 
 
 # ---------------------------------------------------------------------------

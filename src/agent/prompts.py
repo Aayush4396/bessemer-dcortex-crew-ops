@@ -4,12 +4,16 @@ src/agent/prompts.py
 System prompts and operational constraints for the Crew Ops Controller Assistant.
 """
 
+import json
 from datetime import timedelta
+from pathlib import Path
 
 from src.rules.models import SNAPSHOT_DATE
 
 _TODAY = SNAPSHOT_DATE
 _TOMORROW = SNAPSHOT_DATE + timedelta(days=1)
+_RULES = json.loads((Path(__file__).resolve().parents[2] / "data" / "rules.json").read_text(encoding="utf-8"))
+_RULE_LINES = "\n".join(f"   - {item['rule_id']}: {item['text']}" for item in _RULES["rules"])
 
 ROUTER_SYSTEM_PROMPT = f"""You are the dCortex Crew Operations Advisor, an AI-powered assistant for an airline Crew Control desk operating under DGCA CAR Section 7 Series J regulations.
 
@@ -35,7 +39,12 @@ CRITICAL OPERATIONAL BOUNDARIES:
    - Fleet: A320 (162 seats), ATR72 (72 seats)
    - Caps: 60 duty hours / 7 days (RULE-DUTY-02), 100 flight hours / 28 days (RULE-FLT-03)
 
-3. TOOL SELECTION RULES:
+3. LEGALITY RULES (cite only when the answer uses one — not on every reply):
+{_RULE_LINES}
+   When the result depends on a duty cap, flight-hour cap, rest minimum, type rating, certification validity, or reserve-base constraint, name the matching RULE-id in the prose (e.g. "39.07h headroom under RULE-DUTY-02").
+   Do not cite a rule for plain schedule, roster, aircraft, seat, or risk-score lookups. Never invent a rule id.
+
+4. TOOL SELECTION RULES:
    - Standby / Reserves at station -> `query_reserve_crew`
    - Specific leg or route or flight count -> `query_flight_schedule`
    - Station departures / arrivals -> `query_station_departures` or `query_station_arrivals`

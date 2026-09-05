@@ -111,6 +111,7 @@ def get_session(session_id: str, conn: sqlite3.Connection | None = None) -> dict
     """
     c = get_connection(conn)
     try:
+        ensure_chat_tables(c)
         row = c.execute(
             """
             SELECT s.session_id, s.title, s.tier, s.created_at, s.updated_at,
@@ -145,6 +146,7 @@ def list_sessions(conn: sqlite3.Connection | None = None) -> list[dict[str, Any]
     """
     c = get_connection(conn)
     try:
+        ensure_chat_tables(c)
         rows = c.execute(
             """
             SELECT s.session_id, s.title, s.tier, s.created_at, s.updated_at,
@@ -231,6 +233,7 @@ def save_message(
 
     c = get_connection(conn)
     try:
+        ensure_chat_tables(c)
         # Auto-create session if not present
         c.execute(
             """
@@ -280,6 +283,7 @@ def get_session_messages(
     """
     c = get_connection(conn)
     try:
+        ensure_chat_tables(c)
         rows = c.execute(
             """
             SELECT message_id, session_id, sender, content, tier_used,
