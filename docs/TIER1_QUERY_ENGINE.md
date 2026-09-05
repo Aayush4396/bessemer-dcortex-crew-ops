@@ -2,7 +2,7 @@
 
 This document details the **Tier 1 Operational Query Engine** located in [`src/tier1/`](file:///c:/Users/aayus/OneDrive/Desktop/bessemer_dcortex/src/tier1/).
 
-Tier 1 provides deterministic, sub-millisecond query execution against SQLite (`crew_ops.db`) for airline flight movements, crew rosters, standby reserve pools, DGCA rolling duty balances, and certification validities.
+Tier 1 provides deterministic, sub-millisecond query execution against SQLite (`crew_ops.db`) for airline flight movements, crew rosters, standby reserve pools, DGCA rolling duty balances, certification validities, tactical pairings, and entity 360 profiles.
 
 ---
 
@@ -12,7 +12,7 @@ In airline operations control, hallucinating flight schedules, miscalculating du
 
 Tier 1 adheres to three core architectural principles:
 1. **Zero LLM Arithmetic**: All operational calculations (rolling duty hours, headroom against 60h caps, expiry windows, departure counts) are computed using exact Python arithmetic directly against SQLite.
-2. **Clean Domain Modularization**: The query layer is organized by domain responsibilities (`flight_queries.py`, `crew_queries.py`, `roster_queries.py`, `duty_queries.py`, `cert_queries.py`, `risk_queries.py`), ensuring single-responsibility and separation of concerns.
+2. **Clean Domain Modularization**: The query layer is organized by domain responsibilities (`flight_queries.py`, `crew_queries.py`, `roster_queries.py`, `duty_queries.py`, `cert_queries.py`, `risk_queries.py`), complemented by tactical operational engines (`pairings_workspace.py`, `entity_detail.py`).
 3. **Re-Usable Connection Management**: Every handler accepts an optional `conn: sqlite3.Connection`, enabling in-memory testing, transaction reuse, and seamless integration with FastAPI, Pytest, and the LangGraph tool layer.
 
 ---
@@ -26,20 +26,23 @@ flowchart TD
         Test["Pytest Suite (tests/test_tier1.py)"]
         Agent["LangGraph Agent (src/agent/tools.py)"]
         API["FastAPI Endpoints (src/api/server.py)"]
+        UI["React 19 Console (frontend/src/)"]
     end
 
     subgraph Tier1 ["src/tier1/ Domain Packages"]
         Conn["connection.py: get_connection()"]
-        FQ["flight_queries.py\n- get_flights\n- get_departures\n- get_arrivals\n- get_flight_schedule_stats"]
-        CQ["crew_queries.py\n- get_crew_profile\n- get_reserves_at_station"]
-        RQ["roster_queries.py\n- get_pairing_roster"]
-        DQ["duty_queries.py\n- get_crew_duty_balance"]
-        CertQ["cert_queries.py\n- get_expiring_certifications"]
-        RiskQ["risk_queries.py\n- get_crew_risk_signal"]
+        FQ["flight_queries.py (Schedules & Movements)"]
+        CQ["crew_queries.py (Profiles & Reserves)"]
+        RQ["roster_queries.py (Pairing Crew Assignments)"]
+        DQ["duty_queries.py (Rolling 7d/28d Clocks)"]
+        CertQ["cert_queries.py (Expiry Windows)"]
+        RiskQ["risk_queries.py (Disruption Risks)"]
+        PWS["pairings_workspace.py (Tactical Workspace & KPIs)"]
+        EDS["entity_detail.py (Flight & Crew 360)"]
     end
 
     subgraph DB ["SQLite Storage (crew_ops.db)"]
-        SQL[("flights\ncrew\npairings\nreserve_pool\nduty_clock_history\ncertifications\nrisk_signals")]
+        SQL[("flights\ncrew\npairings\npairing_crew\nreserve_pool\nduty_clock_history\ncertifications\nrisk_signals")]
     end
 
     ClientLayer --> Tier1
@@ -60,13 +63,15 @@ flowchart TD
 | [`duty_queries.py`](file:///c:/Users/aayus/OneDrive/Desktop/bessemer_dcortex/src/tier1/duty_queries.py) | `get_crew_duty_balance` | Calculates exact accrued rolling 7-day duty hours, 28-day flight hours, and remaining headroom against 60h and 100h caps across any snapshot date. | `duty_clock_history`<br>`pairings`<br>`crew` |
 | [`cert_queries.py`](file:///c:/Users/aayus/OneDrive/Desktop/bessemer_dcortex/src/tier1/cert_queries.py) | `get_expiring_certifications` | Sliding-window certification query: identifies licences, medicals, recurrent checks expiring within `[as_of_date, as_of_date + days_ahead]`. | `certifications` |
 | [`risk_queries.py`](file:///c:/Users/aayus/OneDrive/Desktop/bessemer_dcortex/src/tier1/risk_queries.py) | `get_crew_risk_signal` | Returns pre-computed disruption and fatigue risk scores and driver description tags. | `risk_signals` |
+| [`pairings_workspace.py`](file:///c:/Users/aayus/OneDrive/Desktop/bessemer_dcortex/src/tier1/pairings_workspace.py) | `get_pairings_workspace` | Tactical pairing roster with live KPIs, multi-day rotation grouping, and composite risk scoring (`low`, `elevated`, `high`, `critical`). See **[Pairings Workspace Guide](file:///c:/Users/aayus/OneDrive/Desktop/bessemer_dcortex/docs/PAIRINGS_WORKSPACE_AND_ENTITIES.md)**. | `pairings`<br>`pairing_crew`<br>`flights` |
+| [`entity_detail.py`](file:///c:/Users/aayus/OneDrive/Desktop/bessemer_dcortex/src/tier1/entity_detail.py) | `get_flight_detail`<br>`get_crew_detail`<br>`list_crew` | Flight 360 and Crew 360 profiles, 7d/28d clocks, and 150-crew directory. See **[Entity 360 Guide](file:///c:/Users/aayus/OneDrive/Desktop/bessemer_dcortex/docs/PAIRINGS_WORKSPACE_AND_ENTITIES.md)**. | `flights`<br>`crew`<br>`pairings` |
 
 ---
 
 ## 3. Deep Dive into Complex Query Handlers
 
 ### A. Dynamic Rolling Duty & Headroom (`get_crew_duty_balance`)
-Evaluating a pilot's 7-day duty hours must account for two distinct periods:
+Evaluating a pilot's 7-day duty hours accounts for two distinct periods:
 1. **Historical Records ($\le$ Snapshot Date):** Read from `duty_clock_history` (4,200 rows in SQLite).
 2. **Planned Roster Duties ($>$ Snapshot Date):** Dynamically aggregated from published `pairings` table rows.
 
@@ -100,28 +105,15 @@ Handles three distinct inquiry patterns:
 2. **By `pairing_id`:** Returns all assigned crew members and their operational roles (`Captain`, `First Officer`, `Senior Cabin Crew`, `Cabin Crew`).
 3. **By `aircraft` & `date` & `role`:** Returns the specific crew member operating an aircraft (e.g. *Who is Senior Cabin Crew on VT-DXB on Sep 16?* $\to$ `C-4809`).
 
-```mermaid
-flowchart LR
-    Caller["get_pairing_roster()"] --> FilterCheck{"Parameter Filter"}
-    
-    FilterCheck -->|crew_id Provided| Reverse["Reverse Lookup:\npairing_crew JOIN pairings\n(Find all flights assigned to pilot)"]
-    FilterCheck -->|pairing_id Provided| FwdPairing["Forward Lookup by Pairing:\npairing_crew\n(Return all crew + ranks on pairing)"]
-    FilterCheck -->|aircraft + date + role| FwdTail["Tail Lookup:\npairings JOIN pairing_crew\n(Return specific officer on aircraft tail)"]
-    
-    Reverse --> ResRev["Output: List of pairings, dates, UTC report/release, flight legs"]
-    FwdPairing --> ResFwd["Output: List of {crew_id, role}"]
-    FwdTail --> ResTail["Output: Specific crew_id (e.g. C-4809)"]
-```
-
 ---
 
 ## 4. The 16 Benchmark Questions (Q01–Q16)
 
-The Tier 1 benchmark suite ([data/questions.json](file:///c:/Users/aayus/OneDrive/Desktop/bessemer_dcortex/data/questions.json)) validates operational accuracy against ground truth answers:
+The Tier 1 benchmark suite ([`data/questions.json`](file:///c:/Users/aayus/OneDrive/Desktop/bessemer_dcortex/data/questions.json)) validates operational accuracy against ground truth answers:
 
 | Question ID | Operational Query | Handler Invoked | Expected Benchmark Answer |
 |:---|:---|:---|:---|
-| **Q01** | BLR reserves on 2026-09-15 & windows | `get_reserves_at_station` | 12 reserves (Captains: C-1329, C-2111, C-2248, C-3677, C-4809, C-5418, etc.) |
+| **Q01** | BLR reserves on 2026-09-15 & windows | `get_reserves_at_station` | 12 reserves (Captains: C-3305, C-3310, C-3315, etc.) |
 | **Q02** | C-1042 7d duty balance & headroom (Sep 14) | `get_crew_duty_balance` | `duty_hours_7d`: **20.93h**, `headroom_hours`: **39.07h** |
 | **Q03** | DEL departures on 2026-09-15 | `get_departures` | 13 flights (DX201, DX203, DX205, DX207, DX209, etc.) |
 | **Q04** | Certifications expiring within 30d of Sep 15 | `get_expiring_certifications` | 24 expiring certs (e.g. C-2087 medical on Sep 22) |
@@ -142,57 +134,21 @@ The Tier 1 benchmark suite ([data/questions.json](file:///c:/Users/aayus/OneDriv
 
 ## 5. Verification & Testing
 
-### Running the Unit Test Suite
+Tier 1 handlers and workspace services are verified by **47 automated tests**:
+- **[`tests/test_tier1.py`](file:///c:/Users/aayus/OneDrive/Desktop/bessemer_dcortex/tests/test_tier1.py)**: 16 benchmark tests (Q01–Q16).
+- **[`tests/test_pairings_workspace.py`](file:///c:/Users/aayus/OneDrive/Desktop/bessemer_dcortex/tests/test_pairings_workspace.py)**: 20 tests verifying tactical roster building, KPIs, and risk models.
+- **[`tests/test_entity_detail.py`](file:///c:/Users/aayus/OneDrive/Desktop/bessemer_dcortex/tests/test_entity_detail.py)**: 11 tests verifying Flight 360 and Crew 360 assembly.
+
+### Running the Tests
 ```powershell
-.venv\Scripts\pytest.exe tests/test_tier1.py -v
-```
-Output:
-```
-tests/test_tier1.py::test_q01_reserves_at_blr PASSED
-tests/test_tier1.py::test_q02_c1042_duty_balance PASSED
-tests/test_tier1.py::test_q03_departures_del PASSED
-tests/test_tier1.py::test_q04_expiring_certifications PASSED
-tests/test_tier1.py::test_q05_flight_dx412_details PASSED
-tests/test_tier1.py::test_q06_c3310_reserve_reachability PASSED
-tests/test_tier1.py::test_q07_c2210_base_rating PASSED
-tests/test_tier1.py::test_q08_pairing_p2291_roster PASSED
-tests/test_tier1.py::test_q09_flights_blr_bom PASSED
-tests/test_tier1.py::test_q10_flight_count_sep16 PASSED
-tests/test_tier1.py::test_q11_captains_at_del PASSED
-tests/test_tier1.py::test_q12_longest_block_time PASSED
-tests/test_tier1.py::test_q13_c2087_flight_hours_28d PASSED
-tests/test_tier1.py::test_q14_nonstop_from_blr PASSED
-tests/test_tier1.py::test_q15_scc_vt_dxb_sep16 PASSED
-tests/test_tier1.py::test_q16_c1042_risk_signal PASSED
-======================== 16 passed in 0.42s ========================
+.venv\Scripts\pytest.exe tests/test_tier1.py tests/test_pairings_workspace.py tests/test_entity_detail.py -v
 ```
 
-### Running the Standalone Benchmark Evaluator
-The standalone evaluation script ([evaluate_tier1.py](file:///c:/Users/aayus/OneDrive/Desktop/bessemer_dcortex/evaluate_tier1.py)) can be run without pytest:
+### Standalone Benchmark Runner
 ```powershell
 .venv\Scripts\python.exe evaluate_tier1.py
 ```
-Output:
 ```
-============================================================
-RUNNING TIER 1 BENCHMARK TESTS (Q01-Q16)
-============================================================
-  [PASS] Q01 (BLR reserves)
-  [PASS] Q02 (C-1042 7d duty & headroom)
-  [PASS] Q03 (DEL departures)
-  [PASS] Q04 (Expiring certifications)
-  [PASS] Q05 (DX412 aircraft & seats)
-  [PASS] Q06 (C-3310 reserve reachability)
-  [PASS] Q07 (C-2210 base & rating)
-  [PASS] Q08 (P-2291 crew roster)
-  [PASS] Q09 (BLR->BOM flights on Sep 17)
-  [PASS] Q10 (Sep 16 total flight count)
-  [PASS] Q11 (Captains based at DEL)
-  [PASS] Q12 (Longest block time)
-  [PASS] Q13 (C-2087 rank & 28d flight hours)
-  [PASS] Q14 (Nonstop destinations from BLR)
-  [PASS] Q15 (VT-DXB SCC on Sep 16)
-  [PASS] Q16 (C-1042 risk score & drivers)
 ============================================================
 Result: 16 PASSED / 0 FAILED
 ============================================================

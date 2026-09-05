@@ -152,6 +152,7 @@ def simulate_station_closure(
     station: str,
     start_utc: str,
     end_utc: str,
+    date: str | None = None,
     conn: sqlite3.Connection | None = None,
 ) -> dict[str, Any]:
     """
@@ -159,7 +160,21 @@ def simulate_station_closure(
     computes delay until reopening (+30m turnaround), and assesses crew FDP feasibility.
     """
     c = get_connection(conn)
-    date_str = start_utc[:10]
+    if "T" in start_utc:
+        date_str = start_utc[:10]
+    else:
+        date_str = date or "2026-09-17"
+        if len(start_utc) == 5:
+            start_utc = f"{date_str}T{start_utc}:00Z"
+        elif len(start_utc) == 8:
+            start_utc = f"{date_str}T{start_utc}Z"
+
+    if "T" not in end_utc:
+        if len(end_utc) == 5:
+            end_utc = f"{date_str}T{end_utc}:00Z"
+        elif len(end_utc) == 8:
+            end_utc = f"{date_str}T{end_utc}Z"
+
     reopen_dt = parse_utc(end_utc) + timedelta(minutes=30)
 
     # 1. Fetch all departures and arrivals touching the closed station in the window
@@ -433,6 +448,7 @@ def simulate_disruption(event: dict[str, Any], conn: sqlite3.Connection | None =
             station=event["station"],
             start_utc=start,
             end_utc=end,
+            date=event.get("date"),
             conn=c,
         )
 
