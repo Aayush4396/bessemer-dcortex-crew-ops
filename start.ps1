@@ -46,23 +46,36 @@ else {
 }
 
 # 3. Start Backend & Frontend Jobs
-Write-Host "[3/4] Starting FastAPI backend on http://127.0.0.1:8000..." -ForegroundColor Yellow
-$BackendJob = Start-Process -FilePath $PythonExe -ArgumentList "-m uvicorn src.api.server:app --host 127.0.0.1 --port 8000" -PassThru -NoNewWindow
-
-Start-Sleep -Seconds 2
-
-Write-Host "[4/4] Starting React frontend on http://127.0.0.1:5173..." -ForegroundColor Yellow
-$FrontendDir = Join-Path $RootDir "frontend"
-$NodeModules = Join-Path $FrontendDir "node_modules"
-
-if (-not (Test-Path $NodeModules)) {
-    Write-Host "Installing frontend dependencies..." -ForegroundColor Yellow
-    Set-Location $FrontendDir
-    npm install
-    Set-Location $RootDir
+$ExistingBackend = Get-NetTCPConnection -LocalPort 8000 -State Listen -ErrorAction SilentlyContinue
+if ($ExistingBackend) {
+    Write-Host "[OK] FastAPI backend is already running on http://127.0.0.1:8000 (PID: $($ExistingBackend[0].OwningProcess))." -ForegroundColor Green
+    $BackendJob = $null
+}
+else {
+    Write-Host "[3/4] Starting FastAPI backend on http://127.0.0.1:8000..." -ForegroundColor Yellow
+    $BackendJob = Start-Process -FilePath $PythonExe -ArgumentList "-m uvicorn src.api.server:app --host 127.0.0.1 --port 8000" -PassThru -NoNewWindow
+    Start-Sleep -Seconds 2
 }
 
-$FrontendJob = Start-Process -FilePath "npm.cmd" -ArgumentList "run dev" -WorkingDirectory $FrontendDir -PassThru -NoNewWindow
+$ExistingFrontend = Get-NetTCPConnection -LocalPort 5173 -State Listen -ErrorAction SilentlyContinue
+if ($ExistingFrontend) {
+    Write-Host "[OK] React frontend is already running on http://127.0.0.1:5173 (PID: $($ExistingFrontend[0].OwningProcess))." -ForegroundColor Green
+    $FrontendJob = $null
+}
+else {
+    Write-Host "[4/4] Starting React frontend on http://127.0.0.1:5173..." -ForegroundColor Yellow
+    $FrontendDir = Join-Path $RootDir "frontend"
+    $NodeModules = Join-Path $FrontendDir "node_modules"
+
+    if (-not (Test-Path $NodeModules)) {
+        Write-Host "Installing frontend dependencies..." -ForegroundColor Yellow
+        Set-Location $FrontendDir
+        npm install
+        Set-Location $RootDir
+    }
+
+    $FrontendJob = Start-Process -FilePath "npm.cmd" -ArgumentList "run dev" -WorkingDirectory $FrontendDir -PassThru -NoNewWindow
+}
 
 Write-Host ""
 Write-Host "=================================================================" -ForegroundColor Green

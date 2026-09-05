@@ -90,29 +90,35 @@ trap cleanup SIGINT SIGTERM EXIT
 # ------------------------------------------------------------------------------
 # 4. Launch FastAPI Backend
 # ------------------------------------------------------------------------------
-echo -e "${YELLOW}[3/4] Starting FastAPI backend on http://127.0.0.1:8000...${NC}"
-
-python -m uvicorn src.api.server:app --host 127.0.0.1 --port 8000 &
-BACKEND_PID=$!
-
-sleep 2
+if curl -s http://127.0.0.1:8000/api/health >/dev/null 2>&1; then
+    echo -e "${GREEN}✓ FastAPI backend is already running on http://127.0.0.1:8000${NC}"
+    BACKEND_PID=""
+else
+    echo -e "${YELLOW}[3/4] Starting FastAPI backend on http://127.0.0.1:8000...${NC}"
+    python -m uvicorn src.api.server:app --host 127.0.0.1 --port 8000 &
+    BACKEND_PID=$!
+    sleep 2
+fi
 
 # ------------------------------------------------------------------------------
 # 5. Launch React + Vite Frontend
 # ------------------------------------------------------------------------------
-echo -e "${YELLOW}[4/4] Starting React frontend on http://127.0.0.1:5173...${NC}"
+if curl -s http://127.0.0.1:5173 >/dev/null 2>&1; then
+    echo -e "${GREEN}✓ React frontend is already running on http://127.0.0.1:5173${NC}"
+    FRONTEND_PID=""
+else
+    echo -e "${YELLOW}[4/4] Starting React frontend on http://127.0.0.1:5173...${NC}"
+    cd "$ROOT_DIR/frontend"
 
-cd "$ROOT_DIR/frontend"
+    if [ ! -d "node_modules" ]; then
+        echo "Installing frontend npm dependencies..."
+        npm install
+    fi
 
-if [ ! -d "node_modules" ]; then
-    echo "Installing frontend npm dependencies..."
-    npm install
+    npm run dev &
+    FRONTEND_PID=$!
+    cd "$ROOT_DIR"
 fi
-
-npm run dev &
-FRONTEND_PID=$!
-
-cd "$ROOT_DIR"
 
 # ------------------------------------------------------------------------------
 # Ready Banner
