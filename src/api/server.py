@@ -6,7 +6,9 @@ Exposes REST endpoints for conversational AI chat, live database statistics,
 and placeholder endpoints for Tier 2 (Disruption Simulator) and Tier 3 (Recovery Optimizer).
 """
 
+import logging
 import os
+import traceback
 from typing import Any
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -223,6 +225,7 @@ def chat_endpoint(req: ChatRequest):
             session_id=req.session_id,
         )
     except Exception as e:
+        logging.error("Chat endpoint error:\n%s", traceback.format_exc())
         raise HTTPException(status_code=500, detail=f"Agent execution error: {str(e)}")
 
 

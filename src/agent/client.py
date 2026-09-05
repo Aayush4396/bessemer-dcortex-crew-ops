@@ -6,10 +6,13 @@ Loads credentials dynamically from environment variables.
 """
 
 import os
+from pathlib import Path
+
 from dotenv import load_dotenv
 from langchain_openai import ChatOpenAI
 
-load_dotenv()
+_PROJECT_ROOT = Path(__file__).resolve().parents[2]
+load_dotenv(_PROJECT_ROOT / ".env", override=True)
 
 
 def get_llm(
@@ -33,9 +36,15 @@ def get_llm(
     -------
     ChatOpenAI
     """
-    api_key = os.getenv("SARVAM_API_KEY", "")
+    api_key = os.getenv("SARVAM_API_KEY") or os.getenv("OPENAI_API_KEY")
     base_url = os.getenv("SARVAM_BASE_URL", "https://api.sarvam.ai/v1")
     model_name = model or os.getenv("SARVAM_MODEL", "sarvam-105b")
+
+    if not api_key or api_key.startswith("your_"):
+        raise RuntimeError(
+            "SARVAM_API_KEY is not configured. Set it in the project .env file "
+            "or provide OPENAI_API_KEY before starting the backend."
+        )
 
     return ChatOpenAI(
         model=model_name,
