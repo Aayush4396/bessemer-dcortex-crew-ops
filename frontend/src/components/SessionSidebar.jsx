@@ -7,8 +7,7 @@ import {
   Clock, 
   ChevronLeft, 
   ChevronRight,
-  Database,
-  Calendar
+  Database
 } from 'lucide-react';
 
 export default function SessionSidebar({
