@@ -1,5 +1,5 @@
 # Core data validation and environment
-pydantic>=2.0.0
+pydantic
 python-dotenv>=1.0.0
 
 # LLM reasoning client & orchestration

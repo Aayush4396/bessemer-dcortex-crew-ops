@@ -1,11 +1,12 @@
 """
 src/agent/tools.py
 ==================
-LangChain tool wrappers for deterministic Tier 1 query functions.
-Strictly delegates to the deterministic domain package `src.tier1`.
+LangChain tool wrappers for Tier 1 query functions and Tier 2/3 resolver functions.
 """
 
+from datetime import date, datetime
 from typing import Any
+
 from langchain_core.tools import tool
 
 from src.tier1 import (
@@ -20,6 +21,15 @@ from src.tier1 import (
     get_expiring_certifications,
     get_crew_risk_signal,
 )
+from src.resolver import (
+    check_cover as _check_cover,
+    cover_options as _cover_options,
+    expand_sick_call as _expand_sick_call,
+    expand_station_closure as _expand_station_closure,
+    expand_delay as _expand_delay,
+)
+from src.resolver.cover import win_sum as _win_sum
+from src.resolver.data import load_all, pairings, crew, FBY
 
 
 @tool
@@ -247,6 +257,136 @@ def query_crew_risk_signal(
     )
 
 
+
+# ── Tier 2 / Tier 3 tools ─────────────────────────────────────────────
+
+def _find_pairing(pairing_id: str) -> dict:
+    load_all()
+    return next(p for p in pairings if p["pairing_id"] == pairing_id)
+
+
+@tool
+def check_crew_cover_legality(
+    crew_id: str,
+    pairing_id: str,
+    exclude_pairing: str | None = None,
+    delay_hours: float = 0.0,
+) -> dict[str, Any]:
+    """
+    Simulate whether a crew member can legally cover a pairing (all days).
+    Checks RULE-FDP-01, RULE-DUTY-02, RULE-REST-04, RULE-QUAL-05, RULE-CERT-06 against
+    their existing duties + the proposed cover assignment.
+    Parameters:
+    - crew_id: Candidate crew member ID (e.g. "C-3310", "C-2087")
+    - pairing_id: Pairing to cover (e.g. "P-2291")
+    - exclude_pairing: Pairing to remove from the crew's existing roster before simulation (e.g. if they are being swapped)
+    - delay_hours: Hours the first departure is delayed (e.g. due to deadhead positioning)
+    """
+    p = _find_pairing(pairing_id)
+    ok, issues = _check_cover(crew_id, p["days"], exclude_pairing=exclude_pairing, delay_h=delay_hours)
+    return {"crew_id": crew_id, "pairing_id": pairing_id, "legal": ok, "issues": issues}
+
+
+@tool
+def get_cover_options(
+    pairing_id: str,
+    role: str,
+    sick_crew_id: str,
+) -> dict[str, Any]:
+    """
+    Enumerate and rank all legal replacement candidates for a crew member who is unavailable
+    for a pairing. Returns ranked options (cheapest first, cancel last) and excluded candidates with reasons.
+    Parameters:
+    - pairing_id: The pairing that needs cover (e.g. "P-2291")
+    - role: The role to fill ("Captain", "First Officer", "Senior Cabin Crew", "Cabin Crew")
+    - sick_crew_id: The unavailable crew member's ID (e.g. "C-1042")
+    """
+    p = _find_pairing(pairing_id)
+    rep_dt = datetime.strptime(p["days"][0]["report_utc"], "%Y-%m-%dT%H:%M:%SZ")
+    opts, exc = _cover_options(p["days"], role, sick_crew_id, pairing_id, rep_dt)
+    return {"options": opts, "excluded_candidates": exc}
+
+
+@tool
+def analyze_sick_call(
+    crew_id: str,
+    pairing_id: str,
+) -> dict[str, Any]:
+    """
+    Analyze a sick call: which flights are uncovered, how many passengers are at risk.
+    Parameters:
+    - crew_id: The sick crew member's ID (e.g. "C-1042")
+    - pairing_id: Their pairing ID (e.g. "P-2291")
+    """
+    return _expand_sick_call(crew_id, pairing_id)
+
+
+@tool
+def analyze_station_closure(
+    station: str,
+    date: str,
+    window_start_utc: str,
+    window_end_utc: str,
+) -> dict[str, Any]:
+    """
+    Analyze which flights are affected by a station closure and whether crew can absorb the delay.
+    Returns affected flights and per-flight delay/FDP assessment.
+    Parameters:
+    - station: Airport IATA code (e.g. "BLR", "HYD")
+    - date: ISO date "YYYY-MM-DD"
+    - window_start_utc: Closure start ISO datetime (e.g. "2026-09-17T08:00:00Z")
+    - window_end_utc: Closure end ISO datetime (e.g. "2026-09-17T14:00:00Z")
+    """
+    return _expand_station_closure(station, date, window_start_utc, window_end_utc)
+
+
+@tool
+def analyze_delay_impact(
+    aircraft: str,
+    date: str,
+    delay_hours: float,
+) -> dict[str, Any]:
+    """
+    Analyze how a technical delay cascades through all legs of an aircraft's pairing,
+    check for FDP breach, and suggest recovery actions.
+    Parameters:
+    - aircraft: Tail registration (e.g. "VT-DXA")
+    - date: ISO date "YYYY-MM-DD"
+    - delay_hours: Delay duration in hours (e.g. 1.5)
+    """
+    return _expand_delay(aircraft, date, delay_hours)
+
+
+@tool
+def compute_duty_window(
+    crew_id: str,
+    as_of_date: str,
+    window_days: int = 7,
+) -> dict[str, Any]:
+    """
+    Compute a crew member's total duty hours over a rolling calendar window
+    including both historical and planned week duties.
+    Parameters:
+    - crew_id: Crew member ID
+    - as_of_date: End date of the window "YYYY-MM-DD"
+    - window_days: Window size in days (default 7 for RULE-DUTY-02)
+    """
+    load_all()
+    d = date.fromisoformat(as_of_date) if isinstance(as_of_date, str) else as_of_date
+    duty_h = _win_sum(crew_id, d, window_days, kind=0)
+    flight_h = _win_sum(crew_id, d, window_days, kind=1)
+    return {
+        "crew_id": crew_id,
+        "window_days": window_days,
+        "as_of_date": as_of_date,
+        "duty_hours": duty_h,
+        "flight_hours": flight_h,
+        "duty_headroom_60h": round(60 - duty_h, 2),
+    }
+
+
+# ── Tool lists ─────────────────────────────────────────────────────────
+
 TIER1_TOOLS = [
     query_flight_schedule,
     query_station_departures,
@@ -260,4 +400,14 @@ TIER1_TOOLS = [
     query_crew_risk_signal,
 ]
 
-TOOL_MAP = {t.name: t for t in TIER1_TOOLS}
+TIER2_TOOLS = [
+    check_crew_cover_legality,
+    get_cover_options,
+    analyze_sick_call,
+    analyze_station_closure,
+    analyze_delay_impact,
+    compute_duty_window,
+]
+
+ALL_TOOLS = TIER1_TOOLS + TIER2_TOOLS
+TOOL_MAP = {t.name: t for t in ALL_TOOLS}

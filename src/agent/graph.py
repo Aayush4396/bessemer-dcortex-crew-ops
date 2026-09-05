@@ -22,7 +22,7 @@ from src.db.chat_store import get_session_messages, save_message
 from .client import get_llm
 from .prompts import ROUTER_SYSTEM_PROMPT
 from .state import AgentState
-from .tools import TIER1_TOOLS, TOOL_MAP
+from .tools import ALL_TOOLS, TOOL_MAP
 
 
 # Parameters that represent temporal/query controls rather than persistent operational entities
@@ -127,7 +127,7 @@ def agent_node(state: AgentState) -> dict[str, Any]:
     formulate tool calls, or synthesize final operational responses.
     """
     llm = get_llm(temperature=0.0)
-    model_with_tools = llm.bind_tools(TIER1_TOOLS)
+    model_with_tools = llm.bind_tools(ALL_TOOLS)
 
     # Use compact context pre-processor
     compact_messages = prepare_compact_context(

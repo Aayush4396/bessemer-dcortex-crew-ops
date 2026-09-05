@@ -33,6 +33,9 @@ yarn-error.log*
 *.zip
 *.tar.gz
 
+# AI session continuity (local working notes, not for commit)
+.ai/
+
 # Editor & OS
 .vscode/
 .idea/
